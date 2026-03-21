@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" fill="none">
+	<defs>
+		<linearGradient id="bg" x1="0" y1="0" x2="1200" y2="1200" gradientUnits="userSpaceOnUse">
+			<stop offset="0" stop-color="#082F49" />
+			<stop offset="1" stop-color="#155E75" />
+		</linearGradient>
+		<linearGradient id="drop" x1="600" y1="300" x2="600" y2="900" gradientUnits="userSpaceOnUse">
+			<stop offset="0" stop-color="#7DD3FC" />
+			<stop offset="1" stop-color="#06B6D4" />
+		</linearGradient>
+	</defs>
+	<rect width="1200" height="1200" rx="48" fill="url(#bg)" />
+	<g opacity="0.18" fill="#67E8F9">
+		<circle cx="280" cy="240" r="88" />
+		<circle cx="980" cy="360" r="52" />
+		<circle cx="210" cy="860" r="70" />
+		<circle cx="980" cy="890" r="94" />
+	</g>
+	<path d="M600 250C600 250 350 510 350 700C350 840 462 950 600 950C738 950 850 840 850 700C850 510 600 250 600 250Z" fill="url(#drop)" />
+	<path d="M600 365C600 365 455 520 455 660C455 746 521 815 600 815C679 815 745 746 745 660C745 520 600 365 600 365Z" fill="#E0F2FE" opacity="0.92" />
+	<text x="600" y="1080" text-anchor="middle" fill="#E0F2FE" font-family="Arial, sans-serif" font-size="72" font-weight="700">UrbanSight</text>
+</svg>
