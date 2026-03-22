@@ -1,7 +1,16 @@
 import { User } from "../models/User.js";
+import passport from "passport";
+import { env } from "../config/env.js";
+import {
+  configureOAuth,
+  isGitHubOAuthEnabled,
+  isGoogleOAuthEnabled,
+} from "../config/oauth.js";
 import { roles } from "../utils/constants.js";
 import { signToken } from "../utils/auth.js";
 import { sendError, sendOk } from "../utils/response.js";
+
+configureOAuth();
 
 function normalizeEmail(email) {
   return String(email || "")
@@ -10,11 +19,21 @@ function normalizeEmail(email) {
 }
 
 function setAuthCookie(res, token) {
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
     maxAge: 24 * 60 * 60 * 1000,
+  });
+}
+
+function clearAuthCookie(res) {
+  const isProduction = process.env.NODE_ENV === "production";
+  res.clearCookie("token", {
+    httpOnly: true,
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
   });
 }
 
@@ -141,8 +160,54 @@ export async function me(req, res) {
 }
 
 export async function logout(_req, res) {
-  res.clearCookie("token");
+  clearAuthCookie(res);
   return sendOk(res, { message: "Logged out" });
+}
+
+export function beginGoogleOAuth(req, res, next) {
+  if (!isGoogleOAuthEnabled()) {
+    return sendError(res, 503, "Google OAuth is not configured");
+  }
+
+  return passport.authenticate("google", {
+    session: false,
+    scope: ["profile", "email"],
+  })(req, res, next);
+}
+
+export function beginGitHubOAuth(req, res, next) {
+  if (!isGitHubOAuthEnabled()) {
+    return sendError(res, 503, "GitHub OAuth is not configured");
+  }
+
+  return passport.authenticate("github", {
+    session: false,
+    scope: ["user:email"],
+  })(req, res, next);
+}
+
+function finalizeOAuthLogin(req, res, provider) {
+  return passport.authenticate(provider, { session: false }, (error, user) => {
+    if (error || !user) {
+      return res.redirect(env.oauthCitizenFailureUrl);
+    }
+
+    if (user.status === "inactive" || !user.isActive) {
+      return res.redirect(`${env.oauthCitizenFailureUrl}&reason=inactive`);
+    }
+
+    const token = signToken({ sub: user._id, role: user.role });
+    setAuthCookie(res, token);
+    return res.redirect(env.oauthCitizenSuccessUrl);
+  })(req, res);
+}
+
+export function completeGoogleOAuth(req, res) {
+  return finalizeOAuthLogin(req, res, "google");
+}
+
+export function completeGitHubOAuth(req, res) {
+  return finalizeOAuthLogin(req, res, "github");
 }
 
 export async function changePassword(req, res) {

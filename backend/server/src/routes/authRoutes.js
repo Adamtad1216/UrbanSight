@@ -1,6 +1,10 @@
 import { Router } from "express";
 import {
+  beginGitHubOAuth,
+  beginGoogleOAuth,
   changePassword,
+  completeGitHubOAuth,
+  completeGoogleOAuth,
   login,
   loginCitizenPortal,
   loginStaffPortal,
@@ -24,6 +28,10 @@ router.post("/register", validateBody(registerSchema), registerCitizen);
 router.post("/login", validateBody(loginSchema), login);
 router.post("/login-citizen", validateBody(loginSchema), loginCitizenPortal);
 router.post("/login-staff", validateBody(loginSchema), loginStaffPortal);
+router.get("/google", beginGoogleOAuth);
+router.get("/google/callback", completeGoogleOAuth);
+router.get("/github", beginGitHubOAuth);
+router.get("/github/callback", completeGitHubOAuth);
 router.post(
   "/change-password",
   authenticate,

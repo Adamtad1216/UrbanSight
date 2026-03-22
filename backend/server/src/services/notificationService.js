@@ -1,5 +1,19 @@
 import { EventEmitter } from "events";
 import { Notification } from "../models/Notification.js";
+import { User } from "../models/User.js";
+import { sendNotificationEmail } from "../utils/email.js";
+
+function buildNotificationSubject(context = {}) {
+  if (context.service === "new_connection") {
+    return "UrbanSight New Connection Update";
+  }
+
+  if (context.service === "issue_reporting") {
+    return "UrbanSight Issue Report Update";
+  }
+
+  return "UrbanSight Notification";
+}
 
 class NotificationService extends EventEmitter {
   constructor() {
@@ -28,6 +42,23 @@ class NotificationService extends EventEmitter {
       });
     } catch (_error) {
       // Keep API actions non-blocking if notification persistence fails.
+    }
+
+    try {
+      const recipient = await User.findById(recipientId)
+        .select("name email status isActive")
+        .lean();
+
+      if (recipient?.email && recipient.status === "active" && recipient.isActive) {
+        await sendNotificationEmail({
+          name: recipient.name,
+          email: recipient.email,
+          subject: buildNotificationSubject(context),
+          message,
+        });
+      }
+    } catch (_error) {
+      // Keep API actions non-blocking if email delivery fails.
     }
 
     return payload;
