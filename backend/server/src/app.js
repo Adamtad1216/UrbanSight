@@ -1,6 +1,10 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import passport from "passport";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import hpp from "hpp";
 import authRoutes from "./routes/authRoutes.js";
 import requestRoutes from "./routes/requestRoutes.js";
 import issueRoutes from "./routes/issueRoutes.js";
@@ -16,6 +20,36 @@ import { checkMaintenanceMode } from "./middleware/maintenanceMode.js";
 import { env } from "./config/env.js";
 
 const app = express();
+const isTest = env.nodeEnv === "test";
+const isProduction = env.nodeEnv === "production";
+
+function sanitizePayloadInPlace(value) {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => sanitizePayloadInPlace(entry));
+    return;
+  }
+
+  if (!value || typeof value !== "object") {
+    return;
+  }
+
+  for (const key of Object.keys(value)) {
+    if (key.startsWith("$") || key.includes(".")) {
+      delete value[key];
+      continue;
+    }
+
+    sanitizePayloadInPlace(value[key]);
+  }
+}
+
+function sanitizeRequest(req, _res, next) {
+  sanitizePayloadInPlace(req.body);
+  sanitizePayloadInPlace(req.params);
+  sanitizePayloadInPlace(req.query);
+
+  next();
+}
 
 function isAllowedLocalDevOrigin(origin) {
   if (typeof origin !== "string") {
@@ -45,8 +79,8 @@ app.use(
         return;
       }
 
-      // Allow localhost origins regardless of port so Vite auto-port changes do not break auth requests.
-      if (isAllowedLocalDevOrigin(origin)) {
+      // Allow localhost origins for local development and tests.
+      if (!isProduction && isAllowedLocalDevOrigin(origin)) {
         callback(null, true);
         return;
       }
@@ -56,8 +90,44 @@ app.use(
     credentials: true,
   }),
 );
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
+if (!isTest) {
+  app.use(
+    rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 500,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: {
+        success: false,
+        message: "Too many requests. Please try again later.",
+      },
+    }),
+  );
+
+  app.use(
+    "/api/auth",
+    rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 60,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: {
+        success: false,
+        message: "Too many authentication attempts. Please try again later.",
+      },
+    }),
+  );
+}
 app.use(express.json({ limit: "10mb" }));
+app.use(sanitizeRequest);
+app.use(hpp());
 app.use(cookieParser());
+app.use(passport.initialize());
 
 app.get("/api", (_req, res) => {
   res.json({
@@ -96,9 +166,13 @@ app.use("/api/system", systemRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
 app.use((err, _req, res, _next) => {
+  if (!isProduction) {
+    console.error(err);
+  }
+
   return res.status(500).json({
     success: false,
-    message: err?.message || "Internal server error",
+    message: isProduction ? "Internal server error" : err?.message || "Internal server error",
   });
 });
 

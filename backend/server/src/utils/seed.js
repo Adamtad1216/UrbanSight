@@ -1,21 +1,27 @@
 import { User } from "../models/User.js";
+import { env } from "../config/env.js";
 import { roles } from "./constants.js";
 
-const seedAdminUser = {
-  name: "System Admin",
-  email: "admin@urbansight.local",
-  password: "admin123",
-  phone: "+251911111111",
-  role: roles.ADMIN,
-  branch: "Sikela Branch",
-  firstLogin: false,
-};
+function buildSeedUsers() {
+  const email = process.env.SEED_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD;
 
-const seedDataUsers = [
-  {
-    ...seedAdminUser,
-  },
-];
+  if (!email || !password) {
+    return [];
+  }
+
+  return [
+    {
+      name: process.env.SEED_ADMIN_NAME || "System Admin",
+      email,
+      password,
+      phone: process.env.SEED_ADMIN_PHONE || "+251911111111",
+      role: roles.ADMIN,
+      branch: process.env.SEED_ADMIN_BRANCH || "Sikela Branch",
+      firstLogin: false,
+    },
+  ];
+}
 
 async function createStaffUserIfMissing(staff) {
   const existingUser = await User.findOne({ email: staff.email });
@@ -27,6 +33,11 @@ async function createStaffUserIfMissing(staff) {
 }
 
 export async function seedDefaultStaffUsers() {
+  if (env.nodeEnv === "production") {
+    return;
+  }
+
+  const seedDataUsers = buildSeedUsers();
   for (const staff of seedDataUsers) {
     await createStaffUserIfMissing(staff);
   }

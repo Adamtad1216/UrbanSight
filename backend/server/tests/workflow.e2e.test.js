@@ -4,6 +4,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { jest } from "@jest/globals";
 import app from "../src/app.js";
 import { User } from "../src/models/User.js";
+import { Tool } from "../src/models/Tool.js";
 import { NewConnectionRequest } from "../src/models/NewConnectionRequest.js";
 import { IssueReport } from "../src/models/IssueReport.js";
 import { Notification } from "../src/models/Notification.js";
@@ -18,6 +19,7 @@ describe("Branch-based new connection workflow", () => {
   const state = {
     users: {},
     tokens: {},
+    tools: {},
   };
 
   beforeAll(async () => {
@@ -158,8 +160,11 @@ describe("Branch-based new connection workflow", () => {
       firstLogin: false,
     });
 
-    const loginAs = async (email) => {
-      const response = await request(app).post("/api/auth/login").send({
+    const loginAs = async (email, portal = "citizen") => {
+      const endpoint =
+        portal === "staff" ? "/api/auth/login-staff" : "/api/auth/login-citizen";
+
+      const response = await request(app).post(endpoint).send({
         email,
         password: "password123",
       });
@@ -167,21 +172,58 @@ describe("Branch-based new connection workflow", () => {
       return response.body.token;
     };
 
-    state.tokens.admin = await loginAs("admin@test.com");
-    state.tokens.citizen = await loginAs("citizen@test.com");
-    state.tokens.directorSikela = await loginAs("director.sikela@test.com");
-    state.tokens.directorSecha = await loginAs("director.secha@test.com");
-    state.tokens.surveyorSikela = await loginAs("surveyor.sikela@test.com");
-    state.tokens.surveyorSecha = await loginAs("surveyor.secha@test.com");
+    state.tokens.admin = await loginAs("admin@test.com", "staff");
+    state.tokens.citizen = await loginAs("citizen@test.com", "citizen");
+    state.tokens.directorSikela = await loginAs(
+      "director.sikela@test.com",
+      "staff",
+    );
+    state.tokens.directorSecha = await loginAs(
+      "director.secha@test.com",
+      "staff",
+    );
+    state.tokens.surveyorSikela = await loginAs(
+      "surveyor.sikela@test.com",
+      "staff",
+    );
+    state.tokens.surveyorSecha = await loginAs("surveyor.secha@test.com", "staff");
     state.tokens.surveyorSikelaBackup = await loginAs(
       "surveyor.sikela.backup@test.com",
+      "staff",
     );
-    state.tokens.financeSikela = await loginAs("finance.sikela@test.com");
-    state.tokens.coordinatorSecha = await loginAs("coordinator.secha@test.com");
+    state.tokens.financeSikela = await loginAs("finance.sikela@test.com", "staff");
+    state.tokens.coordinatorSecha = await loginAs(
+      "coordinator.secha@test.com",
+      "staff",
+    );
     state.tokens.coordinatorSikela = await loginAs(
       "coordinator.sikela@test.com",
+      "staff",
     );
-    state.tokens.technicianSikela = await loginAs("technician.sikela@test.com");
+    state.tokens.technicianSikela = await loginAs(
+      "technician.sikela@test.com",
+      "staff",
+    );
+
+    state.tools.pvc = await Tool.create({
+      code: "PVC-001",
+      description: "PVC Pipe",
+      source: "Warehouse",
+      measurement: "meters",
+      stockPrice: 100,
+      customerPrice: 150,
+      isActive: true,
+    });
+
+    state.tools.valve = await Tool.create({
+      code: "VALVE-002",
+      description: "Control Valve",
+      source: "Warehouse",
+      measurement: "pieces",
+      stockPrice: 250,
+      customerPrice: 300,
+      isActive: true,
+    });
 
     jest
       .spyOn(cloudinary.uploader, "upload_stream")
@@ -207,13 +249,14 @@ describe("Branch-based new connection workflow", () => {
       .set("Authorization", `Bearer ${state.tokens.citizen}`)
       .send({
         customerName: "Citizen User",
+        customerNameAmharic: "አዳም ታደሰ",
         email: "citizen@test.com",
-        tinNumber: "TIN-100",
+        tinNumber: "1234567890",
         phoneNumber: "0911000001",
         numberOfFamily: 5,
         address: "Arba Minch",
         houseNumberZone: "HZ-1",
-        readingZone: "RZ-1",
+        readingZone: "Water Source Kebele",
         meterSize: "20mm",
         customerGroup: "Domestic",
         type: "Private",
@@ -226,6 +269,13 @@ describe("Branch-based new connection workflow", () => {
       });
 
     return response;
+  }
+
+  async function firstBranchApproval(requestId) {
+    return request(app)
+      .patch(`/api/requests/request/${requestId}/branch-officer/approve`)
+      .set("Authorization", `Bearer ${state.tokens.coordinatorSikela}`)
+      .send({ note: "Assign surveyor" });
   }
 
   async function approveRequestByDirector(
@@ -313,27 +363,18 @@ describe("Branch-based new connection workflow", () => {
     const submitResponse = await submitRequest("Sikela Branch");
     const requestId = submitResponse.body.request._id;
     await approveRequestByDirector(requestId);
+    await firstBranchApproval(requestId);
 
     const inspectionPayload = {
       notes: "Site inspection details with required materials",
       toolsRequired: [
         {
-          code: "PVC-001",
-          description: "PVC Pipe",
-          source: "Warehouse",
+          toolId: String(state.tools.pvc._id),
           quantity: 10,
-          measurement: "meters",
-          stockPrice: 100,
-          customerUnitPrice: 150,
         },
         {
-          code: "VALVE-002",
-          description: "Control Valve",
-          source: "Warehouse",
+          toolId: String(state.tools.valve._id),
           quantity: 2,
-          measurement: "pieces",
-          stockPrice: 250,
-          customerUnitPrice: 300,
         },
       ],
     };
@@ -369,6 +410,7 @@ describe("Branch-based new connection workflow", () => {
     const submitResponse = await submitRequest("Sikela Branch");
     const requestId = submitResponse.body.request._id;
     await approveRequestByDirector(requestId);
+    await firstBranchApproval(requestId);
 
     const response = await request(app)
       .patch(`/api/requests/request/${requestId}/inspection`)
@@ -377,13 +419,8 @@ describe("Branch-based new connection workflow", () => {
         notes: "Unauthorized attempt",
         toolsRequired: [
           {
-            code: "PVC-001",
-            description: "PVC Pipe",
-            source: "Warehouse",
+            toolId: String(state.tools.pvc._id),
             quantity: 1,
-            measurement: "meters",
-            stockPrice: 100,
-            customerUnitPrice: 150,
           },
         ],
       });
@@ -395,6 +432,7 @@ describe("Branch-based new connection workflow", () => {
     const submitResponse = await submitRequest("Sikela Branch");
     const requestId = submitResponse.body.request._id;
     await approveRequestByDirector(requestId);
+    await firstBranchApproval(requestId);
 
     const response = await request(app)
       .patch(`/api/requests/request/${requestId}/inspection`)
@@ -403,13 +441,8 @@ describe("Branch-based new connection workflow", () => {
         notes: "Wrong surveyor attempt",
         toolsRequired: [
           {
-            code: "PVC-001",
-            description: "PVC Pipe",
-            source: "Warehouse",
+            toolId: String(state.tools.pvc._id),
             quantity: 1,
-            measurement: "meters",
-            stockPrice: 100,
-            customerUnitPrice: 150,
           },
         ],
       });
@@ -422,6 +455,7 @@ describe("Branch-based new connection workflow", () => {
     const submitResponse = await submitRequest("Sikela Branch");
     const requestId = submitResponse.body.request._id;
     await approveRequestByDirector(requestId);
+    await firstBranchApproval(requestId);
 
     const response = await request(app)
       .patch(`/api/requests/request/${requestId}/inspection`)
@@ -430,13 +464,8 @@ describe("Branch-based new connection workflow", () => {
         notes: "Invalid payload",
         toolsRequired: [
           {
-            code: "",
-            description: "",
-            source: "Warehouse",
+            toolId: "",
             quantity: 0,
-            measurement: "meters",
-            stockPrice: -10,
-            customerUnitPrice: 0,
           },
         ],
       });
@@ -449,6 +478,7 @@ describe("Branch-based new connection workflow", () => {
     const requestId = submitResponse.body.request._id;
 
     await approveRequestByDirector(requestId);
+    await firstBranchApproval(requestId);
 
     await request(app)
       .patch(`/api/requests/request/${requestId}/inspection`)
@@ -457,13 +487,8 @@ describe("Branch-based new connection workflow", () => {
         notes: "Inspection complete",
         toolsRequired: [
           {
-            code: "PVC-001",
-            description: "PVC Pipe",
-            source: "Warehouse",
+            toolId: String(state.tools.pvc._id),
             quantity: 2,
-            measurement: "meters",
-            stockPrice: 100,
-            customerUnitPrice: 150,
           },
         ],
       });
@@ -494,6 +519,7 @@ describe("Branch-based new connection workflow", () => {
     const requestId = submitResponse.body.request._id;
 
     await approveRequestByDirector(requestId);
+    await firstBranchApproval(requestId);
 
     await request(app)
       .patch(`/api/requests/request/${requestId}/inspection`)
@@ -502,13 +528,8 @@ describe("Branch-based new connection workflow", () => {
         notes: "Inspection complete",
         toolsRequired: [
           {
-            code: "PVC-001",
-            description: "PVC Pipe",
-            source: "Warehouse",
+            toolId: String(state.tools.pvc._id),
             quantity: 2,
-            measurement: "meters",
-            stockPrice: 100,
-            customerUnitPrice: 150,
           },
         ],
       });
@@ -540,7 +561,7 @@ describe("Branch-based new connection workflow", () => {
       String(state.users.financeSikela._id),
     );
     expect(String(persisted.assignedBranchOfficer)).toBe(
-      String(state.users.directorSikela._id),
+      String(state.users.coordinatorSikela._id),
     );
   });
 
@@ -549,6 +570,7 @@ describe("Branch-based new connection workflow", () => {
     const requestId = submitResponse.body.request._id;
 
     await approveRequestByDirector(requestId);
+    await firstBranchApproval(requestId);
 
     await request(app)
       .patch(`/api/requests/request/${requestId}/inspection`)
@@ -557,13 +579,8 @@ describe("Branch-based new connection workflow", () => {
         notes: "Inspection complete",
         toolsRequired: [
           {
-            code: "PVC-001",
-            description: "PVC Pipe",
-            source: "Warehouse",
+            toolId: String(state.tools.pvc._id),
             quantity: 2,
-            measurement: "meters",
-            stockPrice: 100,
-            customerUnitPrice: 150,
           },
         ],
       });
@@ -583,6 +600,7 @@ describe("Branch-based new connection workflow", () => {
     const requestId = submitResponse.body.request._id;
 
     await approveRequestByDirector(requestId);
+    await firstBranchApproval(requestId);
 
     await request(app)
       .patch(`/api/requests/request/${requestId}/inspection`)
@@ -591,13 +609,8 @@ describe("Branch-based new connection workflow", () => {
         notes: "Inspection complete",
         toolsRequired: [
           {
-            code: "PVC-001",
-            description: "PVC Pipe",
-            source: "Warehouse",
+            toolId: String(state.tools.pvc._id),
             quantity: 2,
-            measurement: "meters",
-            stockPrice: 100,
-            customerUnitPrice: 150,
           },
         ],
       });
@@ -639,12 +652,39 @@ describe("Branch-based new connection workflow", () => {
   });
 
   it("issue workflow supports receipt upload and finance verification", async () => {
+    await NewConnectionRequest.create({
+      citizen: state.users.citizen._id,
+      customerName: "Citizen User",
+      customerNameAmharic: "አዳም ታደሰ",
+      email: "citizen@test.com",
+      tinNumber: "1234567890",
+      phoneNumber: "0911000001",
+      numberOfFamily: 5,
+      address: "Arba Minch",
+      houseNumberZone: "HZ-1",
+      readingZone: "Water Source Kebele",
+      meterSize: "20mm",
+      customerGroup: "Domestic",
+      type: "Private",
+      serviceType: "New Water Connection",
+      description: "Completed connection for issue workflow",
+      branch: "Sikela Branch",
+      location: { latitude: 6.032, longitude: 37.55 },
+      housePlan: "https://cdn.example.com/plan.pdf",
+      idCard: "https://cdn.example.com/id.pdf",
+      status: "completed",
+      waterConnectionCode: "WTR-1001",
+      customerCode: "CUS-1001",
+    });
+
     const issueResponse = await request(app)
       .post("/api/issues")
       .set("Authorization", `Bearer ${state.tokens.citizen}`)
       .send({
         title: "Pipe leakage",
         description: "Leakage near meter box",
+        waterConnectionCode: "WTR-1001",
+        customerCode: "CUS-1001",
         category: "leakage",
         location: {
           latitude: 6.032,

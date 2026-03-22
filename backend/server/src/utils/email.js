@@ -28,3 +28,19 @@ export async function sendStaffCredentialsEmail({ name, email, tempPassword }) {
     text: `Hello ${name},\n\nYour staff account has been created.\n\nLogin email: ${email}\nTemporary password: ${tempPassword}\n\nFor security, you must change your password immediately after first login.\n\nRegards,\nUrbanSight Admin`,
   });
 }
+
+export async function sendNotificationEmail({ name, email, subject, message }) {
+  if (!email) {
+    return;
+  }
+
+  const transporter = getTransport();
+  const safeName = String(name || "User").trim() || "User";
+
+  await transporter.sendMail({
+    from: env.emailFrom,
+    to: email,
+    subject,
+    text: `Hello ${safeName},\n\n${message}\n\nRegards,\nUrbanSight Team`,
+  });
+}

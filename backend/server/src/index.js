@@ -8,11 +8,13 @@ async function bootstrap() {
   await seedDefaultStaffUsers();
 
   app.listen(env.port, () => {
-    console.log(`UrbanSight API running on http://localhost:${env.port}`);
+    if (env.nodeEnv !== "production") {
+      console.log(`UrbanSight API running on port ${env.port}`);
+    }
   });
 }
 
 bootstrap().catch((error) => {
-  console.error("Failed to start server", error);
+  console.error("Failed to start server", error?.message || error);
   process.exit(1);
 });

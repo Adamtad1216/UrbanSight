@@ -1,7 +1,10 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
-const AUTH_TOKEN_STORAGE_KEY = "urbansight_auth_token";
+if (import.meta.env.PROD && !configuredApiBaseUrl) {
+  throw new Error("VITE_API_BASE_URL is required in production");
+}
+
+const API_BASE_URL = configuredApiBaseUrl || "http://localhost:5000/api";
 
 interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
@@ -78,16 +81,12 @@ export async function uploadFile(file: File): Promise<string> {
 }
 
 export function setStoredAuthToken(token?: string | null) {
-  if (!token) {
-    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-    return;
-  }
-
-  window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  // Session auth is handled by httpOnly cookies. Keep this helper for compatibility.
+  void token;
 }
 
 export function getStoredAuthToken() {
-  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  return null;
 }
 
 export { API_BASE_URL };

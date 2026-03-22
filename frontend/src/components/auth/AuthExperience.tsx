@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Chrome, Eye, EyeOff, Github, Loader2, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthInputField } from "@/components/auth/AuthInputField";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/api";
 import { getDashboardPathByRole } from "@/lib/role-dashboard";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +68,7 @@ export function AuthExperience({
   const [successPulse, setSuccessPulse] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, portal, register: registerUser } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -86,6 +88,22 @@ export function AuthExperience({
   useEffect(() => {
     setMode(registrationEnabled ? initialMode : "login");
   }, [registrationEnabled, initialMode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const hasOAuthError = params.get("oauthError");
+
+    if (!hasOAuthError) {
+      return;
+    }
+
+    toast({
+      title: "Social login failed",
+      description:
+        "Unable to sign in with the selected provider. Please try again.",
+      variant: "destructive",
+    });
+  }, [location.search, toast]);
 
   const switchMode = (nextMode: AuthMode) => {
     if (submitting) return;
@@ -115,12 +133,9 @@ export function AuthExperience({
     toast({ title, description });
   };
 
-  const notifySocialLogin = (provider: "Google" | "GitHub") => {
-    toast({
-      title: `${provider} login coming soon`,
-      description:
-        "OAuth providers can be wired in via your backend auth strategy.",
-    });
+  const startSocialLogin = (provider: "google" | "github") => {
+    const oauthEntry = provider === "google" ? "/auth/google" : "/auth/github";
+    window.location.assign(`${API_BASE_URL}${oauthEntry}`);
   };
 
   const onLoginSubmit = async (values: LoginValues) => {
@@ -424,13 +439,13 @@ export function AuthExperience({
                 <SocialButton
                   icon={Chrome}
                   label="Google"
-                  onClick={() => notifySocialLogin("Google")}
+                  onClick={() => startSocialLogin("google")}
                   reduceMotion={Boolean(reduceMotion)}
                 />
                 <SocialButton
                   icon={Github}
                   label="GitHub"
-                  onClick={() => notifySocialLogin("GitHub")}
+                  onClick={() => startSocialLogin("github")}
                   reduceMotion={Boolean(reduceMotion)}
                 />
               </div>

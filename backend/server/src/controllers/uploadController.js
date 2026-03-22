@@ -1,4 +1,5 @@
 import cloudinary from "../config/cloudinary.js";
+import { env } from "../config/env.js";
 import { sendError, sendOk } from "../utils/response.js";
 
 export async function uploadToCloudinary(req, res) {
@@ -7,9 +8,7 @@ export async function uploadToCloudinary(req, res) {
   }
 
   const hasCloudinaryConfig =
-    process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET;
+    env.cloudinaryCloudName && env.cloudinaryApiKey && env.cloudinaryApiSecret;
 
   if (!hasCloudinaryConfig) {
     return sendError(res, 500, "Cloudinary is not configured on the server");

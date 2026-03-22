@@ -29,6 +29,31 @@ export default defineConfig({
     outDir: "dist/citizen",
     rollupOptions: {
       input: path.resolve(__dirname, "index.citizen.html"),
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return;
+          }
+
+          if (id.includes("react") || id.includes("scheduler")) {
+            return "react-vendor";
+          }
+
+          if (id.includes("@tanstack")) {
+            return "query-vendor";
+          }
+
+          if (id.includes("leaflet") || id.includes("react-leaflet")) {
+            return "map-vendor";
+          }
+
+          if (id.includes("recharts")) {
+            return "charts-vendor";
+          }
+
+          return "vendor";
+        },
+      },
     },
   },
 });
