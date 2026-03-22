@@ -44,22 +44,29 @@ class NotificationService extends EventEmitter {
       // Keep API actions non-blocking if notification persistence fails.
     }
 
-    try {
-      const recipient = await User.findById(recipientId)
-        .select("name email status isActive")
-        .lean();
+    // Email delivery is non-critical for the request lifecycle; run it in background.
+    setImmediate(async () => {
+      try {
+        const recipient = await User.findById(recipientId)
+          .select("name email status isActive")
+          .lean();
 
-      if (recipient?.email && recipient.status === "active" && recipient.isActive) {
-        await sendNotificationEmail({
-          name: recipient.name,
-          email: recipient.email,
-          subject: buildNotificationSubject(context),
-          message,
-        });
+        if (
+          recipient?.email &&
+          recipient.status === "active" &&
+          recipient.isActive
+        ) {
+          await sendNotificationEmail({
+            name: recipient.name,
+            email: recipient.email,
+            subject: buildNotificationSubject(context),
+            message,
+          });
+        }
+      } catch (_error) {
+        // Keep API actions non-blocking if email delivery fails.
       }
-    } catch (_error) {
-      // Keep API actions non-blocking if email delivery fails.
-    }
+    });
 
     return payload;
   }

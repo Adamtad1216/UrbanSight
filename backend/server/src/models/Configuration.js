@@ -4,7 +4,12 @@ const configurationSchema = new mongoose.Schema(
   {
     key: { type: String, required: true, unique: true, trim: true },
     workflow: {
-      requiredTechniciansForCompletion: { type: Number, default: 2, min: 1, max: 10 },
+      requiredTechniciansForCompletion: {
+        type: Number,
+        default: 2,
+        min: 1,
+        max: 10,
+      },
       autoAssignSurveyor: { type: Boolean, default: true },
       autoAssignTechnicians: { type: Boolean, default: true },
       autoAssignMeterReader: { type: Boolean, default: true },
@@ -29,4 +34,7 @@ const configurationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-export const Configuration = mongoose.model("Configuration", configurationSchema);
+export const Configuration = mongoose.model(
+  "Configuration",
+  configurationSchema,
+);

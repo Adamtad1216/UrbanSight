@@ -1,9 +1,15 @@
 import nodemailer from "nodemailer";
 import { env } from "../config/env.js";
 
+let cachedTransporter;
+
 function getTransport() {
+  if (cachedTransporter) {
+    return cachedTransporter;
+  }
+
   if (env.smtpHost && env.smtpPort && env.smtpUser && env.smtpPass) {
-    return nodemailer.createTransport({
+    cachedTransporter = nodemailer.createTransport({
       host: env.smtpHost,
       port: env.smtpPort,
       secure: env.smtpSecure,
@@ -12,10 +18,13 @@ function getTransport() {
         pass: env.smtpPass,
       },
     });
+
+    return cachedTransporter;
   }
 
   // Non-production fallback transport for local development/testing.
-  return nodemailer.createTransport({ jsonTransport: true });
+  cachedTransporter = nodemailer.createTransport({ jsonTransport: true });
+  return cachedTransporter;
 }
 
 export async function sendStaffCredentialsEmail({ name, email, tempPassword }) {
