@@ -46,21 +46,31 @@ export function ApplicationDetailView({
 }: ApplicationDetailViewProps) {
   const tools = request.toolsRequired || [];
   const computedTotal = tools.reduce(
-    (sum, tool) => sum + (tool.totalPrice || tool.customerUnitPrice * tool.quantity),
+    (sum, tool) =>
+      sum + (tool.totalPrice || tool.customerUnitPrice * tool.quantity),
     0,
   );
 
-  const paymentStatus = request.payment?.status || request.paymentInfo?.status || "pending";
-  const paymentMethod = request.payment?.paymentMethod || request.paymentInfo?.method || "-";
-  const transactionId = request.payment?.transactionId || request.paymentInfo?.transactionId || "-";
+  const paymentStatus =
+    request.payment?.status || request.paymentInfo?.status || "pending";
+  const paymentMethod =
+    request.payment?.paymentMethod || request.paymentInfo?.method || "-";
+  const transactionId =
+    request.payment?.transactionId || request.paymentInfo?.transactionId || "-";
 
   const documents = [
     request.housePlan
       ? { id: "house-plan", label: "House Plan", url: request.housePlan }
       : null,
-    request.idCard ? { id: "id-card", label: "ID Card", url: request.idCard } : null,
+    request.idCard
+      ? { id: "id-card", label: "ID Card", url: request.idCard }
+      : null,
     request.payment?.receiptUrl
-      ? { id: "payment-receipt", label: "Payment Receipt", url: request.payment.receiptUrl }
+      ? {
+          id: "payment-receipt",
+          label: "Payment Receipt",
+          url: request.payment.receiptUrl,
+        }
       : null,
     !request.payment?.receiptUrl && request.paymentInfo?.receiptImage
       ? {
@@ -85,7 +95,9 @@ export function ApplicationDetailView({
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
-            <h2 className="text-2xl font-semibold tracking-tight">Application Details</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Application Details
+            </h2>
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <Hash className="h-4 w-4" />
@@ -177,16 +189,27 @@ export function ApplicationDetailView({
                           <td className="px-3 py-2 font-medium">{tool.code}</td>
                           <td className="px-3 py-2">{tool.description}</td>
                           <td className="px-3 py-2">{tool.quantity}</td>
-                          <td className="px-3 py-2">{formatMoney(tool.customerUnitPrice)}</td>
-                          <td className="px-3 py-2">{formatMoney(tool.totalPrice || tool.customerUnitPrice * tool.quantity)}</td>
+                          <td className="px-3 py-2">
+                            {formatMoney(tool.customerUnitPrice)}
+                          </td>
+                          <td className="px-3 py-2">
+                            {formatMoney(
+                              tool.totalPrice ||
+                                tool.customerUnitPrice * tool.quantity,
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 <div className="mt-3 flex justify-end">
-                  <Badge variant="outline" className="rounded-lg px-3 py-1 text-sm">
-                    Total Estimated Cost: {formatMoney(request.totalEstimatedCost || computedTotal)}
+                  <Badge
+                    variant="outline"
+                    className="rounded-lg px-3 py-1 text-sm"
+                  >
+                    Total Estimated Cost:{" "}
+                    {formatMoney(request.totalEstimatedCost || computedTotal)}
                   </Badge>
                 </div>
               </CardContent>
@@ -201,7 +224,10 @@ export function ApplicationDetailView({
               <CardContent className="grid gap-4 sm:grid-cols-3">
                 <InfoField label="Transaction ID" value={transactionId} />
                 <InfoField label="Payment Method" value={paymentMethod} />
-                <InfoField label="Payment Status" value={String(paymentStatus)} />
+                <InfoField
+                  label="Payment Status"
+                  value={String(paymentStatus)}
+                />
               </CardContent>
             </Card>
           )}
@@ -214,24 +240,35 @@ export function ApplicationDetailView({
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <SummaryRow label="Service Type" value={request.serviceType} />
-              <SummaryRow label="Status" value={<StatusBadge status={request.status} />} />
-              <SummaryRow label="Created" value={formatDate(request.createdAt)} />
+              <SummaryRow
+                label="Status"
+                value={<StatusBadge status={request.status} />}
+              />
+              <SummaryRow
+                label="Created"
+                value={formatDate(request.createdAt)}
+              />
               <SummaryRow label="Branch" value={request.branch} />
-              {!showAssignedStaff && showCitizenMeterReaderInfo && request.assignedMeterReader && (
-                <>
-                  <SummaryRow
-                    label="Assigned Meter Reader"
-                    value={getAssigneeName(request.assignedMeterReader)}
-                  />
-                  <SummaryRow
-                    label="Meter Reader Email"
-                    value={getAssigneeEmail(request.assignedMeterReader)}
-                  />
-                </>
-              )}
+              {!showAssignedStaff &&
+                showCitizenMeterReaderInfo &&
+                request.assignedMeterReader && (
+                  <>
+                    <SummaryRow
+                      label="Assigned Meter Reader"
+                      value={getAssigneeName(request.assignedMeterReader)}
+                    />
+                    <SummaryRow
+                      label="Meter Reader Email"
+                      value={getAssigneeEmail(request.assignedMeterReader)}
+                    />
+                  </>
+                )}
               {showAssignedStaff && (
                 <>
-                  <SummaryRow label="Surveyor" value={getAssigneeName(request.assignedSurveyor)} />
+                  <SummaryRow
+                    label="Surveyor"
+                    value={getAssigneeName(request.assignedSurveyor)}
+                  />
                   <SummaryRow
                     label="Technicians"
                     value={
@@ -282,10 +319,15 @@ export function ApplicationDetailView({
           <CardContent className="space-y-4">
             <ApplicationProgressTimeline
               status={request.status}
-              paymentStatus={request.payment?.status || request.paymentInfo?.status}
+              paymentStatus={
+                request.payment?.status || request.paymentInfo?.status
+              }
               branchApprovalStage={request.branchApprovalStage}
             />
-            <RequestTimeline timeline={request.timeline} workflowLogs={request.workflowLogs} />
+            <RequestTimeline
+              timeline={request.timeline}
+              workflowLogs={request.workflowLogs}
+            />
           </CardContent>
         </Card>
 
@@ -295,22 +337,24 @@ export function ApplicationDetailView({
   );
 }
 
-function InfoField({ label, value }: { label: string; value?: string | number }) {
+function InfoField({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number;
+}) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 text-sm font-medium">{value || "-"}</p>
     </div>
   );
 }
 
-function SummaryRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: ReactNode;
-}) {
+function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b pb-2 last:border-b-0 last:pb-0">
       <span className="text-muted-foreground">{label}</span>
