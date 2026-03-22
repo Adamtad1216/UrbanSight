@@ -3,9 +3,9 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
 
-function ensureSpaEntryHtml(outDir: string, sourceHtmlName: string) {
+function renamePortalEntryToIndexHtml(outDir: string, sourceHtmlName: string) {
   return {
-    name: "ensure-spa-entry-html",
+    name: "rename-portal-entry-to-index-html",
     writeBundle() {
       const sourcePath = path.resolve(__dirname, outDir, sourceHtmlName);
       const targetPath = path.resolve(__dirname, outDir, "index.html");
@@ -14,13 +14,18 @@ function ensureSpaEntryHtml(outDir: string, sourceHtmlName: string) {
         return;
       }
 
-      fs.copyFileSync(sourcePath, targetPath);
+      if (fs.existsSync(targetPath)) {
+        fs.unlinkSync(targetPath);
+      }
+
+      fs.renameSync(sourcePath, targetPath);
     },
   };
 }
 
 export default defineConfig({
   root: __dirname,
+  base: "/",
   appType: "spa",
   optimizeDeps: {
     include: ["leaflet", "react-leaflet"],
@@ -33,7 +38,10 @@ export default defineConfig({
       overlay: false,
     },
   },
-  plugins: [react(), ensureSpaEntryHtml("dist/citizen", "index.citizen.html")],
+  plugins: [
+    react(),
+    renamePortalEntryToIndexHtml("dist/citizen", "index.citizen.html"),
+  ],
   define: {
     "import.meta.env.VITE_PORTAL": JSON.stringify("citizen"),
   },
@@ -44,10 +52,9 @@ export default defineConfig({
   },
   build: {
     outDir: "dist/citizen",
+    emptyOutDir: true,
     rollupOptions: {
-      input: {
-        index: path.resolve(__dirname, "index.citizen.html"),
-      },
+      input: path.resolve(__dirname, "index.citizen.html"),
     },
   },
 });
