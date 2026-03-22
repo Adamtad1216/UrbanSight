@@ -39,9 +39,8 @@ export async function createStaffByAdmin(req, res) {
 
   const temporaryPassword = password || generateTemporaryPassword();
 
-  let createdUser;
   try {
-    createdUser = await User.create({
+    const createdUser = await User.create({
       name,
       email: normalizedEmail,
       password: temporaryPassword,
@@ -53,29 +52,44 @@ export async function createStaffByAdmin(req, res) {
       isActive: (status || "active") === "active",
     });
 
-    await sendStaffCredentialsEmail({
-      name,
-      email: normalizedEmail,
-      tempPassword: temporaryPassword,
-    });
-  } catch (error) {
-    if (createdUser?._id) {
-      await User.findByIdAndDelete(createdUser._id);
+    let credentialsEmailSent = true;
+    try {
+      await sendStaffCredentialsEmail({
+        name,
+        email: normalizedEmail,
+        tempPassword: temporaryPassword,
+      });
+    } catch (_emailError) {
+      credentialsEmailSent = false;
     }
 
-    return sendError(
-      res,
-      500,
-      "Unable to create staff account. Please verify email configuration.",
-    );
-  }
-
-  return sendOk(
-    res,
-    {
-      message: "Staff account created and credentials email sent",
+    const baseResponse = {
       user: createdUser.toSafeObject(),
-    },
-    201,
-  );
+      credentialsEmailSent,
+    };
+
+    if (!credentialsEmailSent) {
+      return sendOk(
+        res,
+        {
+          ...baseResponse,
+          message:
+            "Staff account created, but credential email failed to send. Configure SMTP and share temporary password manually.",
+          temporaryPassword,
+        },
+        201,
+      );
+    }
+
+    return sendOk(
+      res,
+      {
+        ...baseResponse,
+        message: "Staff account created and credentials email sent",
+      },
+      201,
+    );
+  } catch (_error) {
+    return sendError(res, 500, "Unable to create staff account");
+  }
 }
