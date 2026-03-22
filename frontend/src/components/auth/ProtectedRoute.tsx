@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { UserRole } from "@/types/auth";
+import { ModernLoader } from "@/components/ui/modern-loader";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,11 +16,7 @@ export function ProtectedRoute({
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-        Loading...
-      </div>
-    );
+    return <ModernLoader fullScreen label="Preparing your workspace" />;
   }
 
   if (!user) {

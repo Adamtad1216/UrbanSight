@@ -131,7 +131,8 @@ export default function BackofficePortalApp() {
                       <StaffLayoutRoute allowedRoles={["meter_reader"]} />
                     }
                   >
-                    <Route path="dashboard" element={<ServiceRequests />} />
+                    <Route path="dashboard" element={<Index />} />
+                    <Route path="connections" element={<ServiceRequests />} />
                   </Route>
                   <Route
                     path="/finance"

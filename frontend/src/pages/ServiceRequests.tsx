@@ -44,7 +44,11 @@ import { Tool } from "@/types/tool";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -56,6 +60,7 @@ import {
 import { useSuccessModal } from "@/hooks/use-success-modal";
 import { getDashboardPathByRole } from "@/lib/role-dashboard";
 import { ApplicationDetailView } from "@/components/request/ApplicationDetailView";
+import { ModernLoader } from "@/components/ui/modern-loader";
 
 type InspectionToolDraft = {
   toolId: string;
@@ -142,7 +147,9 @@ export default function ServiceRequestsPage() {
   );
   const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [loadingTools, setLoadingTools] = useState(false);
-  const [openToolPickerRow, setOpenToolPickerRow] = useState<number | null>(null);
+  const [openToolPickerRow, setOpenToolPickerRow] = useState<number | null>(
+    null,
+  );
 
   const currentUserId = asUserId(
     user?.id || (user as unknown as { _id?: string })?._id,
@@ -266,6 +273,37 @@ export default function ServiceRequestsPage() {
     [inspectionTools],
   );
 
+  const pageMeta = useMemo(() => {
+    if (user?.role === "surveyor") {
+      return {
+        title: "New Requests",
+        subtitle:
+          "Review and process survey assignments and branch-approved requests.",
+      };
+    }
+
+    if (user?.role === "technician") {
+      return {
+        title: "New Requests",
+        subtitle:
+          "Handle assigned field implementation requests and update progress.",
+      };
+    }
+
+    if (user?.role === "meter_reader") {
+      return {
+        title: "New Connections",
+        subtitle:
+          "Completed connections assigned to you for final meter-reading follow-up.",
+      };
+    }
+
+    return {
+      title: "Service Requests",
+      subtitle: "Manage citizen service requests",
+    };
+  }, [user?.role]);
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-ET", {
       style: "currency",
@@ -333,12 +371,14 @@ export default function ServiceRequestsPage() {
       const assignedTechnicianIds = (requestDoc.assignedTechnicians || []).map(
         asUserId,
       );
-      const assignedTechnicianCount = requestDoc.assignedTechnicians?.length || 0;
+      const assignedTechnicianCount =
+        requestDoc.assignedTechnicians?.length || 0;
       const completedTechnicianCount =
         requestDoc.implementationCompletion?.technicianCompletions?.length || 0;
       const isReadyForBranchFinalApproval =
         requestDoc.workflowLogs?.some(
-          (entry) => entry.action === "implementation_ready_for_final_branch_approval",
+          (entry) =>
+            entry.action === "implementation_ready_for_final_branch_approval",
         ) || false;
       const assignedFinanceId = asUserId(requestDoc.assignedFinanceOfficer);
       const assignedMeterReaderId = asUserId(requestDoc.assignedMeterReader);
@@ -482,7 +522,9 @@ export default function ServiceRequestsPage() {
   const submitInspection = async () => {
     if (!selected) return;
 
-    const selectedTools = inspectionTools.filter((tool) => tool.toolId.trim().length > 0);
+    const selectedTools = inspectionTools.filter(
+      (tool) => tool.toolId.trim().length > 0,
+    );
 
     if (selectedTools.length === 0) {
       toast({
@@ -503,7 +545,8 @@ export default function ServiceRequestsPage() {
     if (hasInvalidTools) {
       toast({
         title: "Invalid tools",
-        description: "Please select active tools and set quantity greater than 0.",
+        description:
+          "Please select active tools and set quantity greater than 0.",
         variant: "destructive",
       });
       return;
@@ -535,15 +578,16 @@ export default function ServiceRequestsPage() {
   const submitTechnicalUpdate = async () => {
     if (!selected) return;
 
-    const assignedTechnicianIds = (selected.assignedTechnicians || []).map(asUserId);
+    const assignedTechnicianIds = (selected.assignedTechnicians || []).map(
+      asUserId,
+    );
     const completedTechnicianIds =
       selected.implementationCompletion?.technicianCompletions?.map((entry) =>
         asUserId(entry.technician),
       ) || [];
 
-    const alreadyCompletedByCurrentTechnician = completedTechnicianIds.includes(
-      currentUserId,
-    );
+    const alreadyCompletedByCurrentTechnician =
+      completedTechnicianIds.includes(currentUserId);
 
     if (alreadyCompletedByCurrentTechnician) {
       const pending = Math.max(
@@ -574,9 +618,11 @@ export default function ServiceRequestsPage() {
       await loadRequests();
       setSelected(response.request);
 
-      const totalTechnicians = response.request.assignedTechnicians?.length || 0;
+      const totalTechnicians =
+        response.request.assignedTechnicians?.length || 0;
       const completedTechnicians =
-        response.request.implementationCompletion?.technicianCompletions?.length || 0;
+        response.request.implementationCompletion?.technicianCompletions
+          ?.length || 0;
       const pending = Math.max(totalTechnicians - completedTechnicians, 0);
 
       if (pending > 0) {
@@ -612,7 +658,8 @@ export default function ServiceRequestsPage() {
       requestDoc.implementationCompletion?.technicianCompletions?.length || 0;
     const isReadyForBranchFinalApproval =
       requestDoc.workflowLogs?.some(
-        (entry) => entry.action === "implementation_ready_for_final_branch_approval",
+        (entry) =>
+          entry.action === "implementation_ready_for_final_branch_approval",
       ) || false;
     const assignedSurveyorId = asUserId(requestDoc.assignedSurveyor);
     const assignedFinanceId = asUserId(requestDoc.assignedFinanceOfficer);
@@ -702,11 +749,21 @@ export default function ServiceRequestsPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
+        className="flex flex-wrap items-start justify-between gap-3"
       >
-        <h1 className="text-2xl font-bold tracking-tight">Service Requests</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Manage citizen service requests
-        </p>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {pageMeta.title}
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {pageMeta.subtitle}
+          </p>
+        </div>
+        {user?.role === "meter_reader" && (
+          <Button variant="outline" onClick={() => navigate("/issues")}>
+            Open Issue Reports
+          </Button>
+        )}
       </motion.div>
 
       {/* Filters */}
@@ -776,7 +833,10 @@ export default function ServiceRequestsPage() {
                   colSpan={7}
                   className="text-muted-foreground py-8 text-center"
                 >
-                  Loading requests...
+                  <ModernLoader
+                    label="Loading requests"
+                    className="min-h-[180px]"
+                  />
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
@@ -965,7 +1025,10 @@ export default function ServiceRequestsPage() {
                             tool.quantity * tool.customerUnitPrice;
                           const selectedToolIds = new Set(
                             inspectionTools
-                              .filter((row, rowIndex) => rowIndex !== index && row.toolId)
+                              .filter(
+                                (row, rowIndex) =>
+                                  rowIndex !== index && row.toolId,
+                              )
                               .map((row) => row.toolId),
                           );
                           return (
@@ -993,33 +1056,45 @@ export default function ServiceRequestsPage() {
                                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-[420px] p-0" align="start">
+                                  <PopoverContent
+                                    className="w-[420px] p-0"
+                                    align="start"
+                                  >
                                     <Command>
                                       <CommandInput placeholder="Search tools (e.g. PVC)..." />
                                       <CommandList>
                                         <CommandEmpty>
-                                          {loadingTools ? "Loading tools..." : "No tool found."}
+                                          {loadingTools
+                                            ? "Loading tools..."
+                                            : "No tool found."}
                                         </CommandEmpty>
                                         <CommandGroup>
                                           {availableTools.map((catalogTool) => (
                                             <CommandItem
                                               key={catalogTool._id}
                                               value={`${catalogTool.code} ${catalogTool.description} ${catalogTool.source}`}
-                                              disabled={selectedToolIds.has(catalogTool._id)}
+                                              disabled={selectedToolIds.has(
+                                                catalogTool._id,
+                                              )}
                                               onSelect={() =>
-                                                selectInspectionTool(index, catalogTool)
+                                                selectInspectionTool(
+                                                  index,
+                                                  catalogTool,
+                                                )
                                               }
                                             >
                                               <Check
                                                 className={cn(
                                                   "mr-2 h-4 w-4",
-                                                  tool.toolId === catalogTool._id
+                                                  tool.toolId ===
+                                                    catalogTool._id
                                                     ? "opacity-100"
                                                     : "opacity-0",
                                                 )}
                                               />
                                               <span className="truncate">
-                                                {catalogTool.code} - {catalogTool.description}
+                                                {catalogTool.code} -{" "}
+                                                {catalogTool.description}
                                               </span>
                                             </CommandItem>
                                           ))}
@@ -1099,49 +1174,54 @@ export default function ServiceRequestsPage() {
                   </div>
                 )}
 
-                {user?.role === "technician" && hasCompletableTask(selected) && (
-                  <div className="space-y-2">
-                    {(() => {
-                      const assignedTechnicianIds =
-                        (selected.assignedTechnicians || []).map(asUserId);
-                      const completedTechnicianIds =
-                        selected.implementationCompletion?.technicianCompletions?.map(
-                          (entry) => asUserId(entry.technician),
-                        ) || [];
-                      const alreadyCompletedByCurrentTechnician = completedTechnicianIds.includes(
-                        currentUserId,
-                      );
-                      const pending = Math.max(
-                        assignedTechnicianIds.length - completedTechnicianIds.length,
-                        0,
-                      );
+                {user?.role === "technician" &&
+                  hasCompletableTask(selected) && (
+                    <div className="space-y-2">
+                      {(() => {
+                        const assignedTechnicianIds = (
+                          selected.assignedTechnicians || []
+                        ).map(asUserId);
+                        const completedTechnicianIds =
+                          selected.implementationCompletion?.technicianCompletions?.map(
+                            (entry) => asUserId(entry.technician),
+                          ) || [];
+                        const alreadyCompletedByCurrentTechnician =
+                          completedTechnicianIds.includes(currentUserId);
+                        const pending = Math.max(
+                          assignedTechnicianIds.length -
+                            completedTechnicianIds.length,
+                          0,
+                        );
 
-                      return (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={submitTechnicalUpdate}
-                            disabled={alreadyCompletedByCurrentTechnician}
-                          >
-                            {alreadyCompletedByCurrentTechnician
-                              ? "Submitted"
-                              : "Update Technical Progress"}
-                          </Button>
-                          {alreadyCompletedByCurrentTechnician && pending > 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              Waiting for second technician approval.
-                            </p>
-                          )}
-                          {alreadyCompletedByCurrentTechnician && pending === 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              All technicians approved. Waiting branch officer final approval.
-                            </p>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
+                        return (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={submitTechnicalUpdate}
+                              disabled={alreadyCompletedByCurrentTechnician}
+                            >
+                              {alreadyCompletedByCurrentTechnician
+                                ? "Submitted"
+                                : "Update Technical Progress"}
+                            </Button>
+                            {alreadyCompletedByCurrentTechnician &&
+                              pending > 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  Waiting for second technician approval.
+                                </p>
+                              )}
+                            {alreadyCompletedByCurrentTechnician &&
+                              pending === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  All technicians approved. Waiting branch
+                                  officer final approval.
+                                </p>
+                              )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
               </div>
             </>
           )}

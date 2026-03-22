@@ -63,4 +63,9 @@ export const env = {
   oauthCitizenFailureUrl:
     process.env.OAUTH_CITIZEN_FAILURE_URL ||
     `${clientOrigins[0] || "http://localhost:5173"}/login?oauthError=1`,
+  SEED_ADMIN_NAME: process.env.SEED_ADMIN_NAME || "Admin User",
+  SEED_ADMIN_EMAIL: process.env.SEED_ADMIN_EMAIL || "",
+  SEED_ADMIN_PASSWORD: process.env.SEED_ADMIN_PASSWORD || "",
+  SEED_ADMIN_PHONE: process.env.SEED_ADMIN_PHONE || "+251911111111",
+  
 };

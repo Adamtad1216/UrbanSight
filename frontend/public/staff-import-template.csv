@@ -1,0 +1,5 @@
+Name,Email,Phone,Role,Branch,Status,Password
+John Doe,john.doe@example.com,+251911111111,coordinator,Sikela Branch,active,
+Jane Surveyor,jane.surveyor@example.com,0911222333,surveyor,Secha Branch,active,Survey123
+Finance User,finance.user@example.com,0712345678,finance,Nech Sar Branch,inactive,
+System Admin,admin.staff@example.com,+251944455566,admin,,active,

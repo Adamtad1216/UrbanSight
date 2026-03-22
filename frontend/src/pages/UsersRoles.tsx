@@ -3,12 +3,14 @@ import { motion } from "framer-motion";
 import {
   Briefcase,
   Building2,
+  Download,
   KeyRound,
   Loader2,
   Mail,
   Phone,
   RefreshCcw,
   Shield,
+  Upload,
   UserCog,
   UserPlus,
   Users,
@@ -88,8 +90,10 @@ const branchOptions: BranchName[] = [
   "Secha Branch",
 ];
 const etPhoneRegex = /^(?:\+2519\d{8}|09\d{8}|07\d{8})$/;
-const phoneErrorMessage = "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX";
-const normalizePhoneNumber = (value: string) => value.replace(/\s+/g, "").trim();
+const phoneErrorMessage =
+  "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX";
+const normalizePhoneNumber = (value: string) =>
+  value.replace(/\s+/g, "").trim();
 
 type CreateStaffForm = {
   name: string;
@@ -143,6 +147,14 @@ export default function UsersPage() {
   const [isResettingPassword, setIsResettingPassword] = useState<string | null>(
     null,
   );
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importSummary, setImportSummary] = useState<{
+    successCount: number;
+    failedCount: number;
+    errors: Array<{ row: number; message: string }>;
+  } | null>(null);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -347,6 +359,49 @@ export default function UsersPage() {
     }
   };
 
+  const submitImport = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!importFile) {
+      toast({
+        title: "No file selected",
+        description: "Choose a .xlsx or .csv file to import.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", importFile);
+
+    try {
+      setImporting(true);
+      const response = await apiRequest<{
+        successCount: number;
+        failedCount: number;
+        errors: Array<{ row: number; message: string }>;
+      }>("/admin/import-staff", {
+        method: "POST",
+        body: formData,
+      });
+
+      setImportSummary(response);
+      toast({
+        title: "Import completed",
+        description: `${response.successCount} staff records imported, ${response.failedCount} issues`,
+      });
+      await loadUsers();
+    } catch (error) {
+      toast({
+        title: "Import failed",
+        description: error instanceof Error ? error.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const getStatus = (user: AuthUser): AccountStatus =>
     user.status || (user.isActive ? "active" : "inactive");
 
@@ -363,9 +418,32 @@ export default function UsersPage() {
             Manage staff users, access roles, and account security
           </p>
         </div>
-        <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
-          <UserPlus className="h-4 w-4" /> Add User
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <a href="/staff-import-template.csv" download>
+              <Download className="h-4 w-4" /> Download Template
+            </a>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              setImportSummary(null);
+              setImportFile(null);
+              setImportOpen(true);
+            }}
+          >
+            <Upload className="h-4 w-4" /> Import Staff
+          </Button>
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={() => setCreateOpen(true)}
+          >
+            <UserPlus className="h-4 w-4" /> Add User
+          </Button>
+        </div>
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -899,6 +977,75 @@ export default function UsersPage() {
               {isUpdating ? "Saving changes..." : "Save changes"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Import Staff</DialogTitle>
+            <DialogDescription>
+              Upload a CSV or Excel file using the staff import template.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={submitImport}>
+            <div className="space-y-2">
+              <Label htmlFor="staff-import-file">Excel/CSV File</Label>
+              <Input
+                id="staff-import-file"
+                type="file"
+                accept=".xlsx,.csv"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  setImportFile(file);
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Required headers: Name, Email, Phone, Role, Branch, Status,
+                Password
+              </p>
+            </div>
+
+            {importSummary && (
+              <div className="rounded-xl border p-3 text-sm">
+                <p className="font-medium">
+                  {importSummary.successCount} staff records imported,{" "}
+                  {importSummary.failedCount} issues.
+                </p>
+                {importSummary.errors.length > 0 && (
+                  <div className="mt-2 max-h-40 overflow-y-auto text-xs text-muted-foreground">
+                    {importSummary.errors.slice(0, 10).map((errorItem) => (
+                      <p key={`${errorItem.row}-${errorItem.message}`}>
+                        Row {errorItem.row}: {errorItem.message}
+                      </p>
+                    ))}
+                    {importSummary.errors.length > 10 && (
+                      <p>+{importSummary.errors.length - 10} more entries</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                type="submit"
+                disabled={importing || !importFile}
+                className="gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                {importing ? "Uploading..." : "Upload File"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
