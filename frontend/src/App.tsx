@@ -192,7 +192,9 @@ const App = () => (
                 <Route
                   path="/leakage"
                   element={
-                    <ProtectedRoute allowedRoles={["admin", "director"]}>
+                    <ProtectedRoute
+                      allowedRoles={["admin", "director", "coordinator"]}
+                    >
                       <DashboardLayout>
                         <LeakagePrediction />
                       </DashboardLayout>

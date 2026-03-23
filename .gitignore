@@ -29,3 +29,7 @@ frontend/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Generated analytics backtest outputs
+backend/server/reports/analytics-v2-backtest-*.json
+backend/server/reports/analytics-v2-backtest-latest.json

@@ -28,6 +28,7 @@ import UsersRoles from "@/pages/UsersRoles";
 import ToolsManagement from "@/pages/ToolsManagement";
 import Settings from "@/pages/Settings";
 import Configuration from "@/pages/Configuration";
+import LeakagePrediction from "@/pages/LeakagePrediction";
 
 const queryClient = new QueryClient();
 
@@ -131,8 +132,7 @@ export default function BackofficePortalApp() {
                       <StaffLayoutRoute allowedRoles={["meter_reader"]} />
                     }
                   >
-                    <Route path="dashboard" element={<Index />} />
-                    <Route path="connections" element={<ServiceRequests />} />
+                    <Route path="dashboard" element={<ServiceRequests />} />
                   </Route>
                   <Route
                     path="/finance"
@@ -162,6 +162,16 @@ export default function BackofficePortalApp() {
                     }
                   >
                     <Route path="/configuration" element={<Configuration />} />
+                  </Route>
+
+                  <Route
+                    element={
+                      <StaffLayoutRoute
+                        allowedRoles={["admin", "director", "coordinator"]}
+                      />
+                    }
+                  >
+                    <Route path="/leakage" element={<LeakagePrediction />} />
                   </Route>
 
                   <Route

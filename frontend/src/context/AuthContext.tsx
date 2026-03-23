@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiRequest, setStoredAuthToken } from "@/lib/api";
+import { apiRequest, setActiveAuthPortal, setStoredAuthToken } from "@/lib/api";
 import { AuthResponse, AuthUser } from "@/types/auth";
 import { AuthContext, LoginInput, RegisterInput } from "@/context/auth-context";
 
@@ -35,19 +35,23 @@ export function AuthProvider({
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    setActiveAuthPortal(portal);
+  }, [portal]);
+
   const refreshUser = useCallback(async () => {
     try {
       const response = await apiRequest<{ user: AuthUser }>("/auth/me");
 
       if (!isPortalRoleAllowed(portal, response.user.role)) {
-        setStoredAuthToken(null);
+        setStoredAuthToken(null, portal);
         setUser(null);
         return;
       }
 
       setUser(response.user);
     } catch {
-      setStoredAuthToken(null);
+      setStoredAuthToken(null, portal);
       setUser(null);
     } finally {
       setLoading(false);
@@ -62,12 +66,12 @@ export function AuthProvider({
       });
 
       if (!isPortalRoleAllowed(portal, response.user.role)) {
-        setStoredAuthToken(null);
+        setStoredAuthToken(null, portal);
         setUser(null);
         throw new Error("This account is not allowed in this portal");
       }
 
-      setStoredAuthToken(response.token ?? null);
+      setStoredAuthToken(response.token ?? null, portal);
       setUser(response.user);
       return response.user;
     },
@@ -96,7 +100,7 @@ export function AuthProvider({
 
   const logout = async () => {
     await apiRequest<{ message: string }>("/auth/logout", { method: "POST" });
-    setStoredAuthToken(null);
+    setStoredAuthToken(null, portal);
     setUser(null);
   };
 

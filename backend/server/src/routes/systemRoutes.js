@@ -9,12 +9,7 @@ import {
 
 const router = Router();
 
-router.get(
-  "/status",
-  authenticate,
-  authorize(roles.ADMIN, roles.DIRECTOR),
-  getSystemStatus,
-);
+router.get("/status", authenticate, getSystemStatus);
 
 router.get(
   "/settings",

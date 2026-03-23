@@ -16,6 +16,7 @@ import systemRoutes from "./routes/systemRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import toolRoutes from "./routes/toolRoutes.js";
 import configurationRoutes from "./routes/configurationRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { checkMaintenanceMode } from "./middleware/maintenanceMode.js";
 import { env } from "./config/env.js";
 
@@ -143,6 +144,7 @@ app.get("/api", (_req, res) => {
       tools: "/api/tools",
       configuration: "/api/configuration",
       notifications: "/api/notifications",
+      analytics: "/api/analytics",
     },
   });
 });
@@ -164,6 +166,7 @@ app.use("/api/configuration", configurationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 app.use((err, _req, res, _next) => {
   if (!isProduction) {
@@ -172,7 +175,9 @@ app.use((err, _req, res, _next) => {
 
   return res.status(500).json({
     success: false,
-    message: isProduction ? "Internal server error" : err?.message || "Internal server error",
+    message: isProduction
+      ? "Internal server error"
+      : err?.message || "Internal server error",
   });
 });
 

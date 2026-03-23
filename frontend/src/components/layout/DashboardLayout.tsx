@@ -14,7 +14,9 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [statusChecked, setStatusChecked] = useState(false);
   const { user } = useAuth();
+  const isCitizenPortalUser = user?.role === "citizen";
 
   useEffect(() => {
     const loadStatus = async () => {
@@ -24,8 +26,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         }>("/system/status");
 
         setMaintenanceMode(Boolean(response.settings?.maintenanceMode));
-      } catch {
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.toLowerCase().includes("maintenance")) {
+          setMaintenanceMode(true);
+        }
         // Keep UI resilient if status endpoint is temporarily unavailable.
+      } finally {
+        setStatusChecked(true);
       }
     };
 
@@ -35,7 +43,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => window.clearInterval(interval);
   }, []);
 
-  if (maintenanceMode && user?.role !== "admin") {
+  if (isCitizenPortalUser && !statusChecked) {
+    return <div className="min-h-screen bg-slate-950" />;
+  }
+
+  if (maintenanceMode && isCitizenPortalUser) {
     return <MaintenanceScreen />;
   }
 

@@ -6,6 +6,19 @@ if (import.meta.env.PROD && !configuredApiBaseUrl) {
 
 const API_BASE_URL = configuredApiBaseUrl || "http://localhost:5000/api";
 
+export type AuthPortal = "unified" | "citizen" | "backoffice";
+
+const AUTH_TOKEN_STORAGE_KEY_PREFIX = "urbanflow.auth.token";
+let activeAuthPortal: AuthPortal = "unified";
+
+function getAuthTokenStorageKey(portal: AuthPortal) {
+  return `${AUTH_TOKEN_STORAGE_KEY_PREFIX}.${portal}`;
+}
+
+function resolvePortal(portal?: AuthPortal) {
+  return portal ?? activeAuthPortal;
+}
+
 interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
 }
@@ -80,13 +93,32 @@ export async function uploadFile(file: File): Promise<string> {
   return response.file.url;
 }
 
-export function setStoredAuthToken(token?: string | null) {
-  // Session auth is handled by httpOnly cookies. Keep this helper for compatibility.
-  void token;
+export function setActiveAuthPortal(portal: AuthPortal) {
+  activeAuthPortal = portal;
 }
 
-export function getStoredAuthToken() {
-  return null;
+export function setStoredAuthToken(token?: string | null, portal?: AuthPortal) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const key = getAuthTokenStorageKey(resolvePortal(portal));
+
+  if (!token) {
+    window.sessionStorage.removeItem(key);
+    return;
+  }
+
+  window.sessionStorage.setItem(key, token);
+}
+
+export function getStoredAuthToken(portal?: AuthPortal) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const key = getAuthTokenStorageKey(resolvePortal(portal));
+  return window.sessionStorage.getItem(key);
 }
 
 export { API_BASE_URL };

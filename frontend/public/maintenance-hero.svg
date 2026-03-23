@@ -1,0 +1,43 @@
+<svg width="880" height="480" viewBox="0 0 880 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cardGlow" x1="98" y1="40" x2="772" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#0284C7" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="soft" x1="440" y1="56" x2="440" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FDFF"/>
+      <stop offset="1" stop-color="#ECFEFF"/>
+    </linearGradient>
+    <filter id="blur" x="0" y="0" width="880" height="480" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+  </defs>
+
+  <g opacity="0.45" filter="url(#blur)">
+    <circle cx="180" cy="110" r="90" fill="#22D3EE"/>
+    <circle cx="720" cy="350" r="120" fill="#0EA5E9"/>
+  </g>
+
+  <rect x="98" y="56" width="684" height="368" rx="34" fill="url(#soft)"/>
+  <rect x="98" y="56" width="684" height="368" rx="34" fill="url(#cardGlow)"/>
+  <rect x="98.5" y="56.5" width="683" height="367" rx="33.5" stroke="#BAE6FD"/>
+
+  <rect x="148" y="108" width="584" height="52" rx="14" fill="#ECFEFF"/>
+  <rect x="148" y="186" width="360" height="30" rx="10" fill="#D1FAE5"/>
+  <rect x="148" y="234" width="455" height="24" rx="10" fill="#E0F2FE"/>
+  <rect x="148" y="272" width="410" height="24" rx="10" fill="#E0F2FE"/>
+
+  <g transform="translate(590 214)">
+    <circle cx="86" cy="86" r="86" fill="#CFFAFE"/>
+    <circle cx="86" cy="86" r="70" fill="#A5F3FC"/>
+    <circle cx="86" cy="86" r="52" fill="#67E8F9"/>
+    <path d="M84 48C84 48 60 84 60 102C60 116.359 71.641 128 86 128C100.359 128 112 116.359 112 102C112 84 88 48 88 48C87.2 46.8 84.8 46.8 84 48Z" fill="#0369A1"/>
+    <path d="M86 68C86 68 72 89 72 101C72 108.732 78.268 115 86 115C93.732 115 100 108.732 100 101C100 89 86 68 86 68Z" fill="#E0F2FE"/>
+  </g>
+
+  <g opacity="0.8">
+    <circle cx="178" cy="82" r="6" fill="#22D3EE"/>
+    <circle cx="204" cy="82" r="6" fill="#14B8A6"/>
+    <circle cx="230" cy="82" r="6" fill="#0EA5E9"/>
+  </g>
+</svg>

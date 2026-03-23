@@ -1,0 +1,185 @@
+{
+  "modelVersion": "v2-phase2",
+  "generatedAt": "2026-03-23T17:44:55.203Z",
+  "config": {
+    "horizons": [
+      7,
+      14,
+      30
+    ],
+    "lookbackDays": 180,
+    "stepDays": 7,
+    "positivePercent": 0.2,
+    "geohashPrecision": 6,
+    "sparseDataThresholds": {
+      "minSamples": 30,
+      "minUniqueZones": 5,
+      "minNegativeSamples": 5
+    },
+    "features": [
+      "riskScore",
+      "issueCount",
+      "connectionCount",
+      "confidence",
+      "anomalyFlag"
+    ]
+  },
+  "horizons": {
+    "7": {
+      "trained": true,
+      "intercept": 3.250434,
+      "weights": {
+        "riskScore": 0,
+        "issueCount": 0,
+        "connectionCount": 0,
+        "confidence": 0,
+        "anomalyFlag": 0
+      },
+      "featureStats": {
+        "riskScore": {
+          "mean": 7,
+          "std": 1
+        },
+        "issueCount": {
+          "mean": 0,
+          "std": 1
+        },
+        "connectionCount": {
+          "mean": 1,
+          "std": 1
+        },
+        "confidence": {
+          "mean": 40,
+          "std": 1
+        },
+        "anomalyFlag": {
+          "mean": 0,
+          "std": 1
+        }
+      },
+      "metrics": {
+        "samples": 25,
+        "positives": 25,
+        "precision": 1,
+        "recall": 1,
+        "accuracy": 1
+      },
+      "sparseDataWarning": {
+        "sparseData": true,
+        "reasons": [
+          "samples<30",
+          "uniqueZones<5",
+          "negatives<5"
+        ],
+        "samples": 25,
+        "positives": 25,
+        "negatives": 0,
+        "uniqueZones": 1
+      }
+    },
+    "14": {
+      "trained": true,
+      "intercept": 3.250434,
+      "weights": {
+        "riskScore": 0,
+        "issueCount": 0,
+        "connectionCount": 0,
+        "confidence": 0,
+        "anomalyFlag": 0
+      },
+      "featureStats": {
+        "riskScore": {
+          "mean": 7,
+          "std": 1
+        },
+        "issueCount": {
+          "mean": 0,
+          "std": 1
+        },
+        "connectionCount": {
+          "mean": 1,
+          "std": 1
+        },
+        "confidence": {
+          "mean": 37,
+          "std": 1
+        },
+        "anomalyFlag": {
+          "mean": 0,
+          "std": 1
+        }
+      },
+      "metrics": {
+        "samples": 24,
+        "positives": 24,
+        "precision": 1,
+        "recall": 1,
+        "accuracy": 1
+      },
+      "sparseDataWarning": {
+        "sparseData": true,
+        "reasons": [
+          "samples<30",
+          "uniqueZones<5",
+          "negatives<5"
+        ],
+        "samples": 24,
+        "positives": 24,
+        "negatives": 0,
+        "uniqueZones": 1
+      }
+    },
+    "30": {
+      "trained": true,
+      "intercept": 3.250434,
+      "weights": {
+        "riskScore": 0,
+        "issueCount": 0,
+        "connectionCount": 0,
+        "confidence": 0,
+        "anomalyFlag": 0
+      },
+      "featureStats": {
+        "riskScore": {
+          "mean": 7,
+          "std": 1
+        },
+        "issueCount": {
+          "mean": 0,
+          "std": 1
+        },
+        "connectionCount": {
+          "mean": 1,
+          "std": 1
+        },
+        "confidence": {
+          "mean": 36,
+          "std": 1
+        },
+        "anomalyFlag": {
+          "mean": 0,
+          "std": 1
+        }
+      },
+      "metrics": {
+        "samples": 22,
+        "positives": 22,
+        "precision": 1,
+        "recall": 1,
+        "accuracy": 1
+      },
+      "sparseDataWarning": {
+        "sparseData": true,
+        "reasons": [
+          "samples<30",
+          "uniqueZones<5",
+          "negatives<5"
+        ],
+        "samples": 22,
+        "positives": 22,
+        "negatives": 0,
+        "uniqueZones": 1
+      }
+    }
+  }
+}

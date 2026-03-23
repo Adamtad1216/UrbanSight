@@ -36,7 +36,13 @@ export async function checkMaintenanceMode(req, res, next) {
     return next();
   }
 
-  if (req.path === "/api/system/status") {
+  const requestPath = req.path || "";
+  const originalPath = req.originalUrl || "";
+  if (
+    requestPath === "/api/system/status" ||
+    requestPath === "/system/status" ||
+    originalPath.startsWith("/api/system/status")
+  ) {
     return next();
   }
 

@@ -154,14 +154,14 @@ export default function CitizenDashboardPage() {
 
   const loadNotifications = useCallback(async () => {
     try {
-      const response = await apiRequest<{ notifications: SystemNotification[] }>(
-        "/citizen/notifications",
-      );
+      const response = await apiRequest<{
+        notifications: SystemNotification[];
+      }>("/citizen/notifications");
       return response.notifications || [];
     } catch {
-      const fallback = await apiRequest<{ notifications: SystemNotification[] }>(
-        "/notifications?limit=8",
-      );
+      const fallback = await apiRequest<{
+        notifications: SystemNotification[];
+      }>("/notifications?limit=8");
       return fallback.notifications || [];
     }
   }, []);
@@ -198,9 +198,14 @@ export default function CitizenDashboardPage() {
         setNotifications(notificationData || []);
         setApiSummary(summaryData);
       } catch (error) {
+        const message = error instanceof Error ? error.message : "Try again";
+        if (message.toLowerCase().includes("maintenance")) {
+          return;
+        }
+
         toast({
           title: "Dashboard load failed",
-          description: error instanceof Error ? error.message : "Try again",
+          description: message,
           variant: "destructive",
         });
       } finally {
@@ -256,7 +261,8 @@ export default function CitizenDashboardPage() {
     return {
       totalRequests: apiSummary?.totalRequests ?? computed.totalRequests,
       activeRequests: apiSummary?.activeRequests ?? computed.activeRequests,
-      completedRequests: apiSummary?.completedRequests ?? computed.completedRequests,
+      completedRequests:
+        apiSummary?.completedRequests ?? computed.completedRequests,
       pendingPayments: apiSummary?.pendingPayments ?? computed.pendingPayments,
     };
   }, [allItems, apiSummary]);
@@ -268,7 +274,9 @@ export default function CitizenDashboardPage() {
 
   const activeItems = useMemo(
     () =>
-      allItems.filter((item) => !["completed", "rejected"].includes(item.status)),
+      allItems.filter(
+        (item) => !["completed", "rejected"].includes(item.status),
+      ),
     [allItems],
   );
 
@@ -290,12 +298,15 @@ export default function CitizenDashboardPage() {
     const monthKeys: string[] = [];
     for (let offset = 5; offset >= 0; offset -= 1) {
       const current = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-      monthKeys.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}`);
+      monthKeys.push(
+        `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}`,
+      );
     }
 
-    const trendMap: Record<string, { requests: number; issues: number }> = Object.fromEntries(
-      monthKeys.map((key) => [key, { requests: 0, issues: 0 }]),
-    );
+    const trendMap: Record<string, { requests: number; issues: number }> =
+      Object.fromEntries(
+        monthKeys.map((key) => [key, { requests: 0, issues: 0 }]),
+      );
 
     for (const request of requests) {
       const date = new Date(request.createdAt);
@@ -333,7 +344,14 @@ export default function CitizenDashboardPage() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [allItems]);
 
-  const statusColors = ["#0ea5e9", "#10b981", "#f59e0b", "#64748b", "#8b5cf6", "#ef4444"];
+  const statusColors = [
+    "#0ea5e9",
+    "#10b981",
+    "#f59e0b",
+    "#64748b",
+    "#8b5cf6",
+    "#ef4444",
+  ];
 
   return (
     <div className="space-y-6">
@@ -354,7 +372,8 @@ export default function CitizenDashboardPage() {
               Welcome back, {greetingName}
             </h1>
             <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-              Track your connection requests, monitor issue resolution, and complete pending payments from one place.
+              Track your connection requests, monitor issue resolution, and
+              complete pending payments from one place.
             </p>
           </div>
 
@@ -394,8 +413,12 @@ export default function CitizenDashboardPage() {
             <Card className="rounded-2xl shadow-sm">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Total Requests</p>
-                  <p className="text-3xl font-bold mt-1">{stats.totalRequests}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Total Requests
+                  </p>
+                  <p className="text-3xl font-bold mt-1">
+                    {stats.totalRequests}
+                  </p>
                 </div>
                 <ClipboardList className="h-8 w-8 text-sky-600" />
               </CardContent>
@@ -403,8 +426,12 @@ export default function CitizenDashboardPage() {
             <Card className="rounded-2xl shadow-sm">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Active Requests</p>
-                  <p className="text-3xl font-bold mt-1">{stats.activeRequests}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Active Requests
+                  </p>
+                  <p className="text-3xl font-bold mt-1">
+                    {stats.activeRequests}
+                  </p>
                 </div>
                 <Sparkles className="h-8 w-8 text-indigo-500" />
               </CardContent>
@@ -412,8 +439,12 @@ export default function CitizenDashboardPage() {
             <Card className="rounded-2xl shadow-sm">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Completed Requests</p>
-                  <p className="text-3xl font-bold mt-1">{stats.completedRequests}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Completed Requests
+                  </p>
+                  <p className="text-3xl font-bold mt-1">
+                    {stats.completedRequests}
+                  </p>
                 </div>
                 <FileCheck2 className="h-8 w-8 text-emerald-600" />
               </CardContent>
@@ -421,8 +452,12 @@ export default function CitizenDashboardPage() {
             <Card className="rounded-2xl shadow-sm">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Pending Payments</p>
-                  <p className="text-3xl font-bold mt-1">{stats.pendingPayments}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Pending Payments
+                  </p>
+                  <p className="text-3xl font-bold mt-1">
+                    {stats.pendingPayments}
+                  </p>
                 </div>
                 <CreditCard className="h-8 w-8 text-amber-500" />
               </CardContent>
@@ -443,11 +478,15 @@ export default function CitizenDashboardPage() {
                 <TriangleAlert className="h-4 w-4" /> Payment Required
               </p>
               <p className="text-sm mt-1 text-amber-700/90 dark:text-amber-200/90">
-                Request ID {pendingPaymentItems[0].id.slice(-8).toUpperCase()} requires payment of {formatCurrency(pendingPaymentItems[0].amount)}.
+                Request ID {pendingPaymentItems[0].id.slice(-8).toUpperCase()}{" "}
+                requires payment of{" "}
+                {formatCurrency(pendingPaymentItems[0].amount)}.
               </p>
             </div>
             <Button asChild>
-              <Link to={`/citizen/payment/${pendingPaymentItems[0].id}`}>Pay Now</Link>
+              <Link to={`/citizen/payment/${pendingPaymentItems[0].id}`}>
+                Pay Now
+              </Link>
             </Button>
           </div>
         </motion.section>
@@ -470,7 +509,10 @@ export default function CitizenDashboardPage() {
             ) : activeItems.length === 0 ? (
               <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
                 <p className="font-medium">No active requests right now.</p>
-                <p className="text-sm mt-1">Start a new connection request or report an issue to see live tracking here.</p>
+                <p className="text-sm mt-1">
+                  Start a new connection request or report an issue to see live
+                  tracking here.
+                </p>
               </div>
             ) : (
               activeItems.slice(0, 6).map((item) => (
@@ -482,8 +524,12 @@ export default function CitizenDashboardPage() {
                 >
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                      <p className="text-xs text-muted-foreground">{item.type} ID</p>
-                      <p className="font-mono text-sm font-semibold">{item.id.slice(-8).toUpperCase()}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.type} ID
+                      </p>
+                      <p className="font-mono text-sm font-semibold">
+                        {item.id.slice(-8).toUpperCase()}
+                      </p>
                     </div>
                     <StatusBadge status={item.status} />
                   </div>
@@ -502,13 +548,21 @@ export default function CitizenDashboardPage() {
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" asChild>
-                      <Link to={item.type === "New Connection" ? `/citizen/requests/${item.id}` : "/citizen/my-requests"}>
+                      <Link
+                        to={
+                          item.type === "New Connection"
+                            ? `/citizen/requests/${item.id}`
+                            : "/citizen/my-requests"
+                        }
+                      >
                         View Details
                       </Link>
                     </Button>
                     {item.type === "New Connection" && item.needsPayment && (
                       <Button size="sm" asChild>
-                        <Link to={`/citizen/payment/${item.id}`}>Proceed to Payment</Link>
+                        <Link to={`/citizen/payment/${item.id}`}>
+                          Proceed to Payment
+                        </Link>
                       </Button>
                     )}
                   </div>
@@ -543,7 +597,9 @@ export default function CitizenDashboardPage() {
                       className={`mt-1 h-2.5 w-2.5 rounded-full ${notification.read ? "bg-muted-foreground" : "bg-sky-500"}`}
                     />
                     <div className="min-w-0">
-                      <p className="text-sm leading-snug">{notification.message}</p>
+                      <p className="text-sm leading-snug">
+                        {notification.message}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {new Date(notification.createdAt).toLocaleString()}
                       </p>
@@ -567,12 +623,26 @@ export default function CitizenDashboardPage() {
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={monthlyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    opacity={0.5}
+                  />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                   <Tooltip />
-                  <Bar dataKey="requests" name="Connections" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="issues" name="Issues" fill="#10b981" radius={[6, 6, 0, 0]} />
+                  <Bar
+                    dataKey="requests"
+                    name="Connections"
+                    fill="#0ea5e9"
+                    radius={[6, 6, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="issues"
+                    name="Issues"
+                    fill="#10b981"
+                    radius={[6, 6, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -593,12 +663,26 @@ export default function CitizenDashboardPage() {
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
-                  <Pie data={statusDistribution} dataKey="value" nameKey="name" outerRadius={90} innerRadius={50}>
+                  <Pie
+                    data={statusDistribution}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={90}
+                    innerRadius={50}
+                  >
                     {statusDistribution.map((entry, index) => (
-                      <Cell key={`status-${entry.name}`} fill={statusColors[index % statusColors.length]} />
+                      <Cell
+                        key={`status-${entry.name}`}
+                        fill={statusColors[index % statusColors.length]}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name) => [value, String(name).replace(/_/g, " ")]} />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      value,
+                      String(name).replace(/_/g, " "),
+                    ]}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -621,7 +705,10 @@ export default function CitizenDashboardPage() {
             ) : (
               <div className="overflow-hidden rounded-2xl border border-border/60">
                 <MapContainer
-                  center={[mapItems[0].location!.latitude, mapItems[0].location!.longitude]}
+                  center={[
+                    mapItems[0].location!.latitude,
+                    mapItems[0].location!.longitude,
+                  ]}
                   zoom={12}
                   className="h-[320px] w-full"
                   scrollWheelZoom
@@ -633,14 +720,23 @@ export default function CitizenDashboardPage() {
                   {mapItems.map((item) => (
                     <Marker
                       key={`map-${item.type}-${item.id}`}
-                      position={[item.location!.latitude, item.location!.longitude]}
+                      position={[
+                        item.location!.latitude,
+                        item.location!.longitude,
+                      ]}
                       icon={markerIcon}
                     >
                       <Popup>
                         <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">{item.type}</p>
-                          <p className="font-mono text-sm">{item.id.slice(-8).toUpperCase()}</p>
-                          <p className={`text-xs font-medium ${statusColor(item.status)}`}>
+                          <p className="text-xs text-muted-foreground">
+                            {item.type}
+                          </p>
+                          <p className="font-mono text-sm">
+                            {item.id.slice(-8).toUpperCase()}
+                          </p>
+                          <p
+                            className={`text-xs font-medium ${statusColor(item.status)}`}
+                          >
                             {item.status.replace(/_/g, " ")}
                           </p>
                         </div>

@@ -22,6 +22,8 @@
     "preview": "vite preview --config frontend/vite.config.ts",
     "preview:citizen": "vite preview --config frontend/vite.citizen.config.ts",
     "preview:backoffice": "vite preview --config frontend/vite.backoffice.config.ts",
+    "analytics:backtest:v2": "node backend/server/src/scripts/backtest-analytics-v2.js",
+    "analytics:train:v2:phase2": "node backend/server/src/scripts/train-analytics-v2-phase2.js",
     "test": "npm run test:backend && vitest --config frontend/vitest.config.ts run",
     "test:watch": "vitest --config frontend/vitest.config.ts"
   },
