@@ -1,7 +1,6 @@
 import crypto from "crypto";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { Strategy as GitHubStrategy } from "passport-github2";
 import { User } from "../models/User.js";
 import { roles } from "../utils/constants.js";
 import { env } from "./env.js";
@@ -49,16 +48,8 @@ async function findOrCreateCitizenFromOAuth(profile, provider) {
 export function isGoogleOAuthEnabled() {
   return Boolean(
     env.oauthGoogleClientId &&
-      env.oauthGoogleClientSecret &&
-      env.oauthGoogleCallbackUrl,
-  );
-}
-
-export function isGitHubOAuthEnabled() {
-  return Boolean(
-    env.oauthGithubClientId &&
-      env.oauthGithubClientSecret &&
-      env.oauthGithubCallbackUrl,
+    env.oauthGoogleClientSecret &&
+    env.oauthGoogleCallbackUrl,
   );
 }
 
@@ -78,27 +69,6 @@ export function configureOAuth() {
         async (_accessToken, _refreshToken, profile, done) => {
           try {
             const user = await findOrCreateCitizenFromOAuth(profile, "Google");
-            done(null, user);
-          } catch (error) {
-            done(error);
-          }
-        },
-      ),
-    );
-  }
-
-  if (isGitHubOAuthEnabled()) {
-    passport.use(
-      new GitHubStrategy(
-        {
-          clientID: env.oauthGithubClientId,
-          clientSecret: env.oauthGithubClientSecret,
-          callbackURL: env.oauthGithubCallbackUrl,
-          scope: ["user:email"],
-        },
-        async (_accessToken, _refreshToken, profile, done) => {
-          try {
-            const user = await findOrCreateCitizenFromOAuth(profile, "GitHub");
             done(null, user);
           } catch (error) {
             done(error);

@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { Droplets, Activity, ShieldCheck } from "lucide-react";
+import { Activity, ShieldCheck } from "lucide-react";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -43,7 +43,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
           >
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/20">
-                <Droplets className="h-6 w-6 text-cyan-300" />
+                <img
+                  src="/image.png"
+                  alt="UrbanSight logo"
+                  className="h-6 w-6 rounded-md object-cover"
+                />
               </div>
               <div>
                 <p className="text-lg font-semibold tracking-tight">
@@ -73,7 +77,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
                   reduceMotion={reduceMotion}
                 />
                 <FeatureItem
-                  icon={Droplets}
+                  imageSrc="/image.png"
                   text="Citizen-centered connection request lifecycle"
                   delay={0.15}
                   reduceMotion={reduceMotion}
@@ -97,11 +101,13 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
 function FeatureItem({
   icon: Icon,
+  imageSrc,
   text,
   delay,
   reduceMotion,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
+  imageSrc?: string;
   text: string;
   delay: number;
   reduceMotion: boolean;
@@ -117,7 +123,15 @@ function FeatureItem({
       whileHover={reduceMotion ? undefined : { x: 4, scale: 1.01 }}
       className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3"
     >
-      <Icon className="h-4 w-4 text-cyan-300" />
+      {imageSrc ? (
+        <img
+          src={imageSrc}
+          alt="UrbanSight logo"
+          className="h-4 w-4 rounded object-cover"
+        />
+      ) : Icon ? (
+        <Icon className="h-4 w-4 text-cyan-300" />
+      ) : null}
       <span className="text-sm text-slate-200">{text}</span>
     </motion.div>
   );

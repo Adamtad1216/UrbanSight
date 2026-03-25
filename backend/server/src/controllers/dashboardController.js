@@ -4,19 +4,7 @@ import { Notification } from "../models/Notification.js";
 import { User } from "../models/User.js";
 import { roles } from "../utils/constants.js";
 import { sendOk } from "../utils/response.js";
-
-function monthKey(date) {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthLabel(key) {
-  const [year, month] = key.split("-").map(Number);
-  return new Date(year, month - 1, 1).toLocaleString("en-US", {
-    month: "short",
-    year: "2-digit",
-  });
-}
+import { getLastMonthKeys, monthKey, monthLabel } from "../utils/timeSeries.js";
 
 async function getRevenueCollected() {
   const [requestRevenue, issueRevenue] = await Promise.all([
@@ -40,7 +28,9 @@ async function getRevenueCollected() {
     ]),
   ]);
 
-  return Number(requestRevenue[0]?.total || 0) + Number(issueRevenue[0]?.total || 0);
+  return (
+    Number(requestRevenue[0]?.total || 0) + Number(issueRevenue[0]?.total || 0)
+  );
 }
 
 async function getRolePendingTasksCount(user) {
@@ -80,7 +70,10 @@ async function getRolePendingTasksCount(user) {
   if (user.role === roles.FINANCE) {
     return NewConnectionRequest.countDocuments({
       status: "payment_submitted",
-      $or: [{ assignedFinanceOfficer: user._id }, { assignedFinanceOfficer: null }],
+      $or: [
+        { assignedFinanceOfficer: user._id },
+        { assignedFinanceOfficer: null },
+      ],
     });
   }
 
@@ -107,7 +100,10 @@ async function getRolePendingTasksCount(user) {
 async function getRoleCompletedTasksCount(user) {
   if (user.role === roles.CITIZEN) {
     const [requestCompleted, issueCompleted] = await Promise.all([
-      NewConnectionRequest.countDocuments({ citizen: user._id, status: "completed" }),
+      NewConnectionRequest.countDocuments({
+        citizen: user._id,
+        status: "completed",
+      }),
       IssueReport.countDocuments({ citizen: user._id, status: "completed" }),
     ]);
 
@@ -117,7 +113,15 @@ async function getRoleCompletedTasksCount(user) {
   if (user.role === roles.SURVEYOR) {
     return NewConnectionRequest.countDocuments({
       assignedSurveyor: user._id,
-      status: { $in: ["waiting_payment", "payment_submitted", "payment_verified", "approved", "completed"] },
+      status: {
+        $in: [
+          "waiting_payment",
+          "payment_submitted",
+          "payment_verified",
+          "approved",
+          "completed",
+        ],
+      },
     });
   }
 
@@ -127,7 +131,10 @@ async function getRoleCompletedTasksCount(user) {
         assignedTechnicians: user._id,
         "implementationCompletion.technicianCompletions.technician": user._id,
       }),
-      IssueReport.countDocuments({ assignedTechnician: user._id, status: "completed" }),
+      IssueReport.countDocuments({
+        assignedTechnician: user._id,
+        status: "completed",
+      }),
     ]);
 
     return requestDone + issueDone;
@@ -154,16 +161,21 @@ async function getRoleCompletedTasksCount(user) {
 export async function getDashboardStats(req, res) {
   const user = req.user;
 
-  const [totalRequests, pendingTasks, completedTasks, revenueCollected, activeStaff] =
-    await Promise.all([
-      user.role === roles.CITIZEN
-        ? NewConnectionRequest.countDocuments({ citizen: user._id })
-        : NewConnectionRequest.countDocuments(),
-      getRolePendingTasksCount(user),
-      getRoleCompletedTasksCount(user),
-      getRevenueCollected(),
-      User.countDocuments({ role: { $ne: roles.CITIZEN }, status: "active" }),
-    ]);
+  const [
+    totalRequests,
+    pendingTasks,
+    completedTasks,
+    revenueCollected,
+    activeStaff,
+  ] = await Promise.all([
+    user.role === roles.CITIZEN
+      ? NewConnectionRequest.countDocuments({ citizen: user._id })
+      : NewConnectionRequest.countDocuments(),
+    getRolePendingTasksCount(user),
+    getRoleCompletedTasksCount(user),
+    getRevenueCollected(),
+    User.countDocuments({ role: { $ne: roles.CITIZEN }, status: "active" }),
+  ]);
 
   return sendOk(res, {
     stats: {
@@ -200,12 +212,7 @@ export async function getDashboardCharts(_req, res) {
     .select("createdAt status totalEstimatedCost payment")
     .lean();
 
-  const lastSix = [];
-  const now = new Date();
-  for (let i = 5; i >= 0; i -= 1) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    lastSix.push(monthKey(d));
-  }
+  const lastSix = getLastMonthKeys(6);
 
   const requestsOverTimeMap = Object.fromEntries(
     lastSix.map((key) => [key, { requests: 0, completed: 0 }]),
@@ -228,7 +235,9 @@ export async function getDashboardCharts(_req, res) {
       (statusDistributionMap[request.status] || 0) + 1;
 
     if (request.payment?.status === "verified") {
-      const paymentKey = monthKey(request.payment.verifiedAt || request.createdAt);
+      const paymentKey = monthKey(
+        request.payment.verifiedAt || request.createdAt,
+      );
       if (revenueTrendMap[paymentKey] !== undefined) {
         revenueTrendMap[paymentKey] += Number(request.totalEstimatedCost || 0);
       }

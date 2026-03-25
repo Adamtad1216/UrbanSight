@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Chrome, Eye, EyeOff, Github, Loader2, Sparkles } from "lucide-react";
+import { Chrome, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthInputField } from "@/components/auth/AuthInputField";
@@ -18,8 +18,10 @@ import { cn } from "@/lib/utils";
 
 type AuthMode = "login" | "register";
 const etPhoneRegex = /^(?:\+2519\d{8}|09\d{8}|07\d{8})$/;
-const phoneErrorMessage = "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX";
-const normalizePhoneNumber = (value: string) => value.replace(/\s+/g, "").trim();
+const phoneErrorMessage =
+  "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX";
+const normalizePhoneNumber = (value: string) =>
+  value.replace(/\s+/g, "").trim();
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -133,9 +135,8 @@ export function AuthExperience({
     toast({ title, description });
   };
 
-  const startSocialLogin = (provider: "google" | "github") => {
-    const oauthEntry = provider === "google" ? "/auth/google" : "/auth/github";
-    window.location.assign(`${API_BASE_URL}${oauthEntry}`);
+  const startGoogleLogin = () => {
+    window.location.assign(`${API_BASE_URL}/auth/google`);
   };
 
   const onLoginSubmit = async (values: LoginValues) => {
@@ -219,15 +220,22 @@ export function AuthExperience({
           )}
         >
           <div className="mb-6 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">
-                {t("auth.title", "UrbanSight Access")}
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold text-white">
-                {mode === "login"
-                  ? t("auth.signIn", "Sign in")
-                  : t("auth.createAccount", "Create account")}
-              </h2>
+            <div className="flex items-center gap-3">
+              <img
+                src="/image.png"
+                alt="UrbanSight logo"
+                className="h-10 w-10 rounded-xl border border-white/20 object-cover"
+              />
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">
+                  {t("auth.title", "UrbanSight Access")}
+                </p>
+                <h2 className="mt-1 text-2xl font-semibold text-white">
+                  {mode === "login"
+                    ? t("auth.signIn", "Sign in")
+                    : t("auth.createAccount", "Create account")}
+                </h2>
+              </div>
             </div>
             <Sparkles className="h-5 w-5 text-cyan-300" />
           </div>
@@ -378,7 +386,8 @@ export function AuthExperience({
                   autoComplete="tel"
                   error={registerForm.formState.errors.phone?.message}
                   {...registerForm.register("phone", {
-                    setValueAs: (value: string) => normalizePhoneNumber(String(value ?? "")),
+                    setValueAs: (value: string) =>
+                      normalizePhoneNumber(String(value ?? "")),
                   })}
                 />
 
@@ -435,17 +444,11 @@ export function AuthExperience({
                 <div className="h-px flex-1 bg-white/10" />
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3">
                 <SocialButton
                   icon={Chrome}
                   label="Google"
-                  onClick={() => startSocialLogin("google")}
-                  reduceMotion={Boolean(reduceMotion)}
-                />
-                <SocialButton
-                  icon={Github}
-                  label="GitHub"
-                  onClick={() => startSocialLogin("github")}
+                  onClick={startGoogleLogin}
                   reduceMotion={Boolean(reduceMotion)}
                 />
               </div>

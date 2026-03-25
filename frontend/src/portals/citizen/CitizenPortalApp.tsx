@@ -20,6 +20,7 @@ import RegisterPage from "@/pages/auth/Register";
 import UnauthorizedPage from "@/pages/auth/Unauthorized";
 import NotFound from "@/pages/NotFound";
 import CitizenDashboardPage from "@/pages/citizen/Dashboard";
+import CitizenLandingPage from "@/pages/citizen/Landing";
 import CitizenNewConnectionPage from "@/pages/citizen/NewConnection";
 import CitizenMyRequestsPage from "@/pages/citizen/MyRequests";
 import CitizenRequestDetailsPage from "@/pages/citizen/RequestDetails";
@@ -53,16 +54,16 @@ export default function CitizenPortalApp() {
             <BrowserRouter>
               <SuccessModalProvider>
                 <Routes>
-                  <Route
-                    path="/"
-                    element={<Navigate to="/citizen/dashboard" replace />}
-                  />
+                  <Route path="/" element={<CitizenLandingPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
                   <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
                   <Route path="/citizen" element={<CitizenLayoutRoute />}>
-                    <Route path="dashboard" element={<CitizenDashboardPage />} />
+                    <Route
+                      path="dashboard"
+                      element={<CitizenDashboardPage />}
+                    />
                     <Route
                       path="new-connection"
                       element={<CitizenNewConnectionPage />}

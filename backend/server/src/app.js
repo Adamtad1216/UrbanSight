@@ -17,6 +17,7 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import toolRoutes from "./routes/toolRoutes.js";
 import configurationRoutes from "./routes/configurationRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
+import publicRoutes from "./routes/publicRoutes.js";
 import { checkMaintenanceMode } from "./middleware/maintenanceMode.js";
 import { env } from "./config/env.js";
 
@@ -167,6 +168,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/public", publicRoutes);
 
 app.use((err, _req, res, _next) => {
   if (!isProduction) {

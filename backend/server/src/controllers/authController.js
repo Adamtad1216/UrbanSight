@@ -1,11 +1,7 @@
 import { User } from "../models/User.js";
 import passport from "passport";
 import { env } from "../config/env.js";
-import {
-  configureOAuth,
-  isGitHubOAuthEnabled,
-  isGoogleOAuthEnabled,
-} from "../config/oauth.js";
+import { configureOAuth, isGoogleOAuthEnabled } from "../config/oauth.js";
 import { roles } from "../utils/constants.js";
 import { signToken } from "../utils/auth.js";
 import { sendError, sendOk } from "../utils/response.js";
@@ -175,17 +171,6 @@ export function beginGoogleOAuth(req, res, next) {
   })(req, res, next);
 }
 
-export function beginGitHubOAuth(req, res, next) {
-  if (!isGitHubOAuthEnabled()) {
-    return sendError(res, 503, "GitHub OAuth is not configured");
-  }
-
-  return passport.authenticate("github", {
-    session: false,
-    scope: ["user:email"],
-  })(req, res, next);
-}
-
 function finalizeOAuthLogin(req, res, provider) {
   return passport.authenticate(provider, { session: false }, (error, user) => {
     if (error || !user) {
@@ -204,10 +189,6 @@ function finalizeOAuthLogin(req, res, provider) {
 
 export function completeGoogleOAuth(req, res) {
   return finalizeOAuthLogin(req, res, "google");
-}
-
-export function completeGitHubOAuth(req, res) {
-  return finalizeOAuthLogin(req, res, "github");
 }
 
 export async function changePassword(req, res) {

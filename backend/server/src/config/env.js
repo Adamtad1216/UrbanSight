@@ -54,9 +54,6 @@ export const env = {
   oauthGoogleClientId: process.env.OAUTH_GOOGLE_CLIENT_ID || "",
   oauthGoogleClientSecret: process.env.OAUTH_GOOGLE_CLIENT_SECRET || "",
   oauthGoogleCallbackUrl: process.env.OAUTH_GOOGLE_CALLBACK_URL || "",
-  oauthGithubClientId: process.env.OAUTH_GITHUB_CLIENT_ID || "",
-  oauthGithubClientSecret: process.env.OAUTH_GITHUB_CLIENT_SECRET || "",
-  oauthGithubCallbackUrl: process.env.OAUTH_GITHUB_CALLBACK_URL || "",
   oauthCitizenSuccessUrl:
     process.env.OAUTH_CITIZEN_SUCCESS_URL ||
     `${clientOrigins[0] || "http://localhost:5173"}/citizen/dashboard`,
@@ -67,5 +64,4 @@ export const env = {
   SEED_ADMIN_EMAIL: process.env.SEED_ADMIN_EMAIL || "",
   SEED_ADMIN_PASSWORD: process.env.SEED_ADMIN_PASSWORD || "",
   SEED_ADMIN_PHONE: process.env.SEED_ADMIN_PHONE || "+251911111111",
-  
 };
