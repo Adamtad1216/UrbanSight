@@ -29,12 +29,82 @@ if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET is required");
 }
 
+function parseInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseBoolean(value, fallback) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["false", "0", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+}
+
+function normalizeDbMode(value) {
+  const mode = String(value || "local")
+    .trim()
+    .toLowerCase();
+  if (["local", "atlas", "auto"].includes(mode)) {
+    return mode;
+  }
+
+  return "local";
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: process.env.PORT || 5000,
-  mongoUri: process.env.MONGO_URI || "mongodb://127.0.0.1:27017/urbansight",
+  mongoUri: process.env.MONGO_URI || "",
+  mongoAtlasUri: process.env.MONGO_ATLAS_URI || "",
+  dbMode: normalizeDbMode(process.env.DB_MODE),
+  dbName: process.env.DB_NAME || "urbansight",
+  mongoHost: process.env.MONGO_HOST || "127.0.0.1",
+  mongoPort: parseInteger(process.env.MONGO_PORT, 27017),
+  mongoDbUser: process.env.MONGO_DB_USER || "",
+  mongoDbPassword: process.env.MONGO_DB_PASSWORD || "",
+  mongoAuthSource: process.env.MONGO_AUTH_SOURCE || "admin",
   localMongoUri:
     process.env.MONGO_LOCAL_URI || "mongodb://127.0.0.1:27017/urbansight",
+  mongoRetryAttempts: parseInteger(process.env.MONGO_RETRY_ATTEMPTS, 8),
+  mongoRetryInitialDelayMs: parseInteger(
+    process.env.MONGO_RETRY_INITIAL_DELAY_MS,
+    1000,
+  ),
+  mongoRetryMaxDelayMs: parseInteger(
+    process.env.MONGO_RETRY_MAX_DELAY_MS,
+    30000,
+  ),
+  mongoMaxPoolSize: parseInteger(process.env.MONGO_MAX_POOL_SIZE, 50),
+  mongoMinPoolSize: parseInteger(process.env.MONGO_MIN_POOL_SIZE, 5),
+  mongoMaxIdleTimeMs: parseInteger(process.env.MONGO_MAX_IDLE_TIME_MS, 300000),
+  mongoSocketTimeoutMs: parseInteger(
+    process.env.MONGO_SOCKET_TIMEOUT_MS,
+    30000,
+  ),
+  mongoConnectTimeoutMs: parseInteger(
+    process.env.MONGO_CONNECT_TIMEOUT_MS,
+    10000,
+  ),
+  mongoServerSelectionTimeoutMs: parseInteger(
+    process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS,
+    5000,
+  ),
+  syncIndexesOnStartup: parseBoolean(
+    process.env.SYNC_INDEXES_ON_STARTUP,
+    (process.env.NODE_ENV || "development") === "production",
+  ),
+  logLevel: process.env.LOG_LEVEL || "info",
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "1d",
   clientOrigin: clientOrigins[0] || "http://localhost:5173",
@@ -64,4 +134,8 @@ export const env = {
   SEED_ADMIN_EMAIL: process.env.SEED_ADMIN_EMAIL || "",
   SEED_ADMIN_PASSWORD: process.env.SEED_ADMIN_PASSWORD || "",
   SEED_ADMIN_PHONE: process.env.SEED_ADMIN_PHONE || "+251911111111",
+  backupDir:
+    process.env.BACKUP_DIR || path.resolve(workspaceRootDir, "backups"),
+  mongodumpPath: process.env.MONGODUMP_PATH || "mongodump",
+  mongorestorePath: process.env.MONGORESTORE_PATH || "mongorestore",
 };

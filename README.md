@@ -59,9 +59,36 @@ Minimum required:
 
 ```env
 PORT=5000
+DB_MODE=local
+DB_NAME=urbansight
 MONGO_URI=mongodb://127.0.0.1:27017/urbansight
 JWT_SECRET=change-this-secret
 CLIENT_ORIGIN=http://localhost:5173
+```
+
+Recommended local production-safe DB settings:
+
+```env
+MONGO_HOST=127.0.0.1
+MONGO_PORT=27017
+MONGO_DB_USER=urbansight_app
+MONGO_DB_PASSWORD=change-this-password
+MONGO_AUTH_SOURCE=admin
+
+MONGO_RETRY_ATTEMPTS=8
+MONGO_RETRY_INITIAL_DELAY_MS=1000
+MONGO_RETRY_MAX_DELAY_MS=30000
+MONGO_MAX_POOL_SIZE=50
+MONGO_MIN_POOL_SIZE=5
+MONGO_SOCKET_TIMEOUT_MS=30000
+MONGO_CONNECT_TIMEOUT_MS=10000
+MONGO_SERVER_SELECTION_TIMEOUT_MS=5000
+SYNC_INDEXES_ON_STARTUP=false
+
+LOG_LEVEL=info
+BACKUP_DIR=./backups
+MONGODUMP_PATH=mongodump
+MONGORESTORE_PATH=mongorestore
 ```
 
 Common optional integrations:
@@ -120,6 +147,47 @@ Backend only:
 ```bash
 npm run start
 ```
+
+## Local MongoDB Production Notes
+
+1. Install MongoDB Community Server and MongoDB Database Tools (includes mongodump/mongorestore).
+2. Start MongoDB service locally.
+3. Create an application database user (run in mongosh):
+
+```javascript
+use admin
+db.createUser({
+	user: "urbansight_app",
+	pwd: "change-this-password",
+	roles: [{ role: "readWrite", db: "urbansight" }],
+})
+```
+
+4. Set DB auth variables in backend/.env and keep secrets out of source control.
+5. In production, set a strong JWT secret and restrict CLIENT_ORIGIN/CLIENT_ORIGINS to trusted domains.
+
+The API exposes health checks at /health and /api/health. They return 503 when the database is unavailable.
+
+## Backup and Restore
+
+Create a backup:
+
+```bash
+npm run backup
+```
+
+Restore a backup:
+
+```bash
+npm run restore -- backups/urbansight-YYYYMMDD-HHMMSS
+```
+
+To run daily automatic backups, schedule npm run backup via your OS scheduler:
+
+- Windows Task Scheduler: run once per day (for example 02:00)
+- Linux cron example: 0 2 \* \* \* cd /path/to/project && npm run backup
+
+If your local database has legacy duplicate values, keep SYNC_INDEXES_ON_STARTUP=false in development for clean startup logs. After data cleanup, set it to true (especially in production) to enforce schema indexes at boot.
 
 ## Build
 

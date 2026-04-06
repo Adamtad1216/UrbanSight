@@ -68,7 +68,7 @@ userSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      phone: { $type: "string", $ne: "" },
+      phone: { $exists: true, $gt: "" },
     },
   },
 );

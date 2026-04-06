@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import passport from "passport";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import morgan from "morgan";
 import hpp from "hpp";
 import authRoutes from "./routes/authRoutes.js";
 import requestRoutes from "./routes/requestRoutes.js";
@@ -20,10 +21,19 @@ import analyticsRoutes from "./routes/analyticsRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import { checkMaintenanceMode } from "./middleware/maintenanceMode.js";
 import { env } from "./config/env.js";
+import { logger } from "./utils/logger.js";
+import { verifyDatabaseHealth } from "./config/db.js";
+import {
+  globalErrorHandler,
+  notFoundHandler,
+  requireDatabaseConnection,
+} from "./middleware/errorMiddleware.js";
 
 const app = express();
 const isTest = env.nodeEnv === "test";
 const isProduction = env.nodeEnv === "production";
+
+app.disable("x-powered-by");
 
 function sanitizePayloadInPlace(value) {
   if (Array.isArray(value)) {
@@ -49,7 +59,6 @@ function sanitizeRequest(req, _res, next) {
   sanitizePayloadInPlace(req.body);
   sanitizePayloadInPlace(req.params);
   sanitizePayloadInPlace(req.query);
-
   next();
 }
 
@@ -92,6 +101,15 @@ app.use(
     credentials: true,
   }),
 );
+if (!isTest) {
+  app.use(
+    morgan("combined", {
+      stream: {
+        write: (message) => logger.info(message.trim()),
+      },
+    }),
+  );
+}
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -150,11 +168,28 @@ app.get("/api", (_req, res) => {
   });
 });
 
-app.get("/api/health", (_req, res) => {
-  res.json({ success: true, message: "UrbanSight API running" });
+app.get("/health", async (_req, res) => {
+  const health = await verifyDatabaseHealth();
+  const statusCode = health.ok ? 200 : 503;
+  return res.status(statusCode).json({
+    success: health.ok,
+    service: "UrbanSight API",
+    database: health,
+  });
+});
+
+app.get("/api/health", async (_req, res) => {
+  const health = await verifyDatabaseHealth();
+  const statusCode = health.ok ? 200 : 503;
+  return res.status(statusCode).json({
+    success: health.ok,
+    service: "UrbanSight API",
+    database: health,
+  });
 });
 
 app.use(checkMaintenanceMode);
+app.use(requireDatabaseConnection);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
@@ -170,17 +205,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/public", publicRoutes);
 
-app.use((err, _req, res, _next) => {
-  if (!isProduction) {
-    console.error(err);
-  }
-
-  return res.status(500).json({
-    success: false,
-    message: isProduction
-      ? "Internal server error"
-      : err?.message || "Internal server error",
-  });
-});
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
 
 export default app;

@@ -25,7 +25,9 @@
     "analytics:backtest:v2": "node backend/server/src/scripts/backtest-analytics-v2.js",
     "analytics:train:v2:phase2": "node backend/server/src/scripts/train-analytics-v2-phase2.js",
     "test": "npm run test:backend && vitest --config frontend/vitest.config.ts run",
-    "test:watch": "vitest --config frontend/vitest.config.ts"
+    "test:watch": "vitest --config frontend/vitest.config.ts",
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -80,6 +82,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.462.0",
     "mongoose": "^9.3.0",
+    "morgan": "^1.10.1",
     "multer": "^2.1.1",
     "next-themes": "^0.3.0",
     "nodemailer": "^8.0.2",
@@ -97,6 +100,7 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
+    "winston": "^3.19.0",
     "xlsx": "^0.18.5",
     "zod": "^3.25.76"
   },
