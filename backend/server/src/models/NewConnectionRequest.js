@@ -2,7 +2,10 @@ import mongoose from "mongoose";
 import { branches, requestStatuses } from "../utils/constants.js";
 
 const etPhoneRegex = /^(?:\+2519\d{8}|09\d{8}|07\d{8})$/;
-const normalizePhoneNumber = (value) => String(value ?? "").replace(/\s+/g, "").trim();
+const normalizePhoneNumber = (value) =>
+  String(value ?? "")
+    .replace(/\s+/g, "")
+    .trim();
 
 const workflowLogSchema = new mongoose.Schema(
   {
@@ -91,6 +94,18 @@ const paymentSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const adjustmentSchema = new mongoose.Schema(
+  {
+    requested: { type: Boolean, default: false },
+    reason: { type: String, trim: true, default: "" },
+    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    requestedByRole: { type: String, trim: true, default: "" },
+    requestedAt: { type: Date },
+    returnStatus: { type: String, enum: requestStatuses },
+  },
+  { _id: false },
+);
+
 const implementationCompletionSchema = new mongoose.Schema(
   {
     technicianCompletions: {
@@ -141,10 +156,19 @@ const newConnectionRequestSchema = new mongoose.Schema(
       required: true,
       trim: true,
       set: normalizePhoneNumber,
-      match: [etPhoneRegex, "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX"],
+      match: [
+        etPhoneRegex,
+        "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX",
+      ],
     },
     numberOfFamily: { type: Number, required: true, min: 1, max: 30 },
-    address: { type: String, required: true, trim: true, minlength: 5, maxlength: 150 },
+    address: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 5,
+      maxlength: 150,
+    },
     houseNumberZone: {
       type: String,
       required: true,
@@ -196,14 +220,7 @@ const newConnectionRequestSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: [
-        "Private",
-        "Shared",
-        "Tap",
-        "Hydrant",
-        "Cattle Drink",
-        "Well",
-      ],
+      enum: ["Private", "Shared", "Tap", "Hydrant", "Cattle Drink", "Well"],
       required: true,
     },
     serviceType: {
@@ -246,13 +263,17 @@ const newConnectionRequestSchema = new mongoose.Schema(
       type: String,
       trim: true,
       uppercase: true,
-      default: null,
+      default: undefined,
+      set: (value) =>
+        value == null || String(value).trim() === "" ? undefined : value,
     },
     customerCode: {
       type: String,
       trim: true,
       uppercase: true,
-      default: null,
+      default: undefined,
+      set: (value) =>
+        value == null || String(value).trim() === "" ? undefined : value,
     },
     branchApprovalStage: {
       type: Number,
@@ -288,6 +309,10 @@ const newConnectionRequestSchema = new mongoose.Schema(
     implementationCompletion: {
       type: implementationCompletionSchema,
       default: () => ({ technicianCompletions: [] }),
+    },
+    adjustment: {
+      type: adjustmentSchema,
+      default: () => ({ requested: false, reason: "" }),
     },
     workflowLogs: {
       type: [workflowLogSchema],

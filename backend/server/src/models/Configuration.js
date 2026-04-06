@@ -26,6 +26,16 @@ const configurationSchema = new mongoose.Schema(
     notifications: {
       notifyCitizenOnStatusChange: { type: Boolean, default: true },
       notifyAssigneeOnAutoAssignment: { type: Boolean, default: true },
+      enablePush: { type: Boolean, default: true },
+      enableEmail: { type: Boolean, default: true },
+      accountCreationTemplate: {
+        push: { type: String, trim: true, default: "" },
+        email: { type: String, trim: true, default: "" },
+      },
+      workflowStepTemplates: {
+        type: mongoose.Schema.Types.Mixed,
+        default: () => ({ new_connection: {} }),
+      },
     },
     citizenPortal: {
       showAssignedMeterReaderInfo: { type: Boolean, default: true },

@@ -86,7 +86,7 @@ router.patch(
 router.patch(
   "/:id/reject",
   authenticate,
-  authorize(roles.COORDINATOR),
+  authorize(roles.COORDINATOR, roles.ADMIN, roles.DIRECTOR),
   issueApproveRules,
   validateRules,
   validateBody(requestApprovalSchema),

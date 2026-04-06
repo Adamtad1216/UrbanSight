@@ -10,6 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface IssueUser {
   _id?: string;
@@ -76,6 +83,8 @@ export default function IssueReportsPage() {
   const [toolDraftByIssueId, setToolDraftByIssueId] = useState<
     Record<string, ToolDraft>
   >({});
+  const [rejectIssueId, setRejectIssueId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const loadIssues = useCallback(async () => {
     try {
@@ -144,13 +153,36 @@ export default function IssueReportsPage() {
       "Issue approved and assigned to technician.",
     );
 
-  const onCoordinatorReject = (issueId: string) =>
+  const onCoordinatorReject = (issueId: string, reason: string) =>
     mutateIssue(
       `reject-${issueId}`,
       `/issues/${issueId}/reject`,
-      { note: "Branch officer rejected issue" },
+      { note: reason },
       "Issue rejected successfully.",
     );
+
+  const openRejectDialog = (issueId: string) => {
+    setRejectIssueId(issueId);
+    setRejectReason("");
+  };
+
+  const confirmReject = async () => {
+    if (!rejectIssueId) return;
+
+    const reason = rejectReason.trim();
+    if (reason.length < 3) {
+      toast({
+        title: "Reject reason required",
+        description: "Please provide at least 3 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await onCoordinatorReject(rejectIssueId, reason);
+    setRejectIssueId(null);
+    setRejectReason("");
+  };
 
   const onTechnicianCompleteWithoutTools = (issueId: string) =>
     mutateIssue(
@@ -201,6 +233,10 @@ export default function IssueReportsPage() {
     );
 
   const canCoordinatorAct = user?.role === "coordinator";
+  const canRejectIssueRole =
+    user?.role === "coordinator" ||
+    user?.role === "director" ||
+    user?.role === "admin";
   const canTechnicianAct = user?.role === "technician";
   const isFinance = user?.role === "finance";
 
@@ -340,10 +376,15 @@ export default function IssueReportsPage() {
                           ? "Approving..."
                           : "Approve"}
                       </Button>
+                    </div>
+                  ) : null}
+
+                  {canRejectIssueRole && issue.status === "submitted" ? (
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => onCoordinatorReject(issue._id)}
+                        onClick={() => openRejectDialog(issue._id)}
                         disabled={busyKey === `reject-${issue._id}`}
                       >
                         {busyKey === `reject-${issue._id}`
@@ -507,6 +548,51 @@ export default function IssueReportsPage() {
           })}
         </div>
       )}
+
+      <Dialog
+        open={rejectIssueId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRejectIssueId(null);
+            setRejectReason("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reject Issue</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="issue-reject-reason">Reason</Label>
+            <Textarea
+              id="issue-reject-reason"
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              rows={4}
+              placeholder="Write rejection reason for the citizen"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setRejectIssueId(null);
+                  setRejectReason("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={confirmReject}
+              >
+                Confirm Reject
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -29,7 +29,8 @@ export default function CitizenRequestDetailsPage() {
           }>("/configuration");
 
           setShowMeterReaderInfo(
-            configResponse.configuration?.citizenPortal?.showAssignedMeterReaderInfo ?? true,
+            configResponse.configuration?.citizenPortal
+              ?.showAssignedMeterReaderInfo ?? true,
           );
         } catch {
           setShowMeterReaderInfo(true);
@@ -55,6 +56,7 @@ export default function CitizenRequestDetailsPage() {
   const canSubmitPayment =
     request.status === "waiting_payment" ||
     request.status === "payment_rejected";
+  const canResubmitAdjustment = request.status === "adjustment_requested";
 
   return (
     <div className="space-y-6">
@@ -68,6 +70,21 @@ export default function CitizenRequestDetailsPage() {
                 Proceed to Payment
               </Link>
             </Button>
+          ) : canResubmitAdjustment ? (
+            <div className="space-y-3">
+              {request.adjustment?.reason ? (
+                <p className="text-sm text-muted-foreground">
+                  Adjustment reason: {request.adjustment.reason}
+                </p>
+              ) : null}
+              <Button asChild>
+                <Link
+                  to={`/citizen/new-connection?adjustmentRequestId=${request._id}`}
+                >
+                  Edit and Resubmit Application
+                </Link>
+              </Button>
+            </div>
           ) : null
         }
       />

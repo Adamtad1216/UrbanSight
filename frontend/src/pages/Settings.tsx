@@ -13,8 +13,10 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const etPhoneRegex = /^(?:\+2519\d{8}|09\d{8}|07\d{8})$/;
-const phoneErrorMessage = "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX";
-const normalizePhoneNumber = (value: string) => value.replace(/\s+/g, "").trim();
+const phoneErrorMessage =
+  "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX";
+const normalizePhoneNumber = (value: string) =>
+  value.replace(/\s+/g, "").trim();
 
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth();
@@ -36,7 +38,6 @@ export default function SettingsPage() {
   const [notificationPrefs, setNotificationPrefs] = useState({
     email: true,
     push: true,
-    sms: false,
     dailyDigest: true,
   });
   const [systemPrefs, setSystemPrefs] = useState({
@@ -278,7 +279,10 @@ export default function SettingsPage() {
         </p>
       </motion.div>
 
-      <Tabs defaultValue={isCitizen ? "notifications" : "profile"} className="w-full">
+      <Tabs
+        defaultValue={isCitizen ? "notifications" : "profile"}
+        className="w-full"
+      >
         <TabsList className="bg-muted/50 border border-border/50">
           {!isCitizen && (
             <TabsTrigger value="profile" className="gap-2">
@@ -481,21 +485,6 @@ export default function SettingsPage() {
                 checked={notificationPrefs.push}
                 onCheckedChange={(value) =>
                   updateNotificationPref("push", value)
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">SMS alerts</p>
-                <p className="text-xs text-muted-foreground">
-                  Emergency notifications by SMS
-                </p>
-              </div>
-              <Switch
-                checked={notificationPrefs.sms}
-                onCheckedChange={(value) =>
-                  updateNotificationPref("sms", value)
                 }
               />
             </div>

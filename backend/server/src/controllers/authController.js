@@ -5,6 +5,7 @@ import { configureOAuth, isGoogleOAuthEnabled } from "../config/oauth.js";
 import { roles } from "../utils/constants.js";
 import { signToken } from "../utils/auth.js";
 import { sendError, sendOk } from "../utils/response.js";
+import { notifyAccountCreated } from "../services/accountNotificationService.js";
 
 configureOAuth();
 
@@ -12,6 +13,12 @@ function normalizeEmail(email) {
   return String(email || "")
     .trim()
     .toLowerCase();
+}
+
+function normalizePhone(phone) {
+  return String(phone ?? "")
+    .replace(/\s+/g, "")
+    .trim();
 }
 
 function setAuthCookie(res, token) {
@@ -54,10 +61,18 @@ function sendAuthenticatedUser(res, user, statusCode = 200) {
 export async function registerCitizen(req, res) {
   const { name, email, password, phone } = req.body;
   const normalizedEmail = normalizeEmail(email);
+  const normalizedPhone = normalizePhone(phone);
   const exists = await User.findOne({ email: normalizedEmail });
 
   if (exists) {
     return sendError(res, 409, "Email already in use");
+  }
+
+  if (normalizedPhone) {
+    const phoneExists = await User.findOne({ phone: normalizedPhone }).lean();
+    if (phoneExists) {
+      return sendError(res, 409, "Phone number already in use");
+    }
   }
 
   const user = await User.create({
@@ -69,6 +84,12 @@ export async function registerCitizen(req, res) {
     firstLogin: false,
     status: "active",
   });
+
+  try {
+    await notifyAccountCreated({ user });
+  } catch {
+    // Account registration should succeed even if notification delivery fails.
+  }
 
   return sendAuthenticatedUser(res, user, 201);
 }
@@ -231,7 +252,7 @@ export async function updateProfile(req, res) {
   const nextEmail =
     req.body.email !== undefined ? normalizeEmail(req.body.email) : undefined;
   const nextPhone =
-    req.body.phone !== undefined ? String(req.body.phone).trim() : undefined;
+    req.body.phone !== undefined ? normalizePhone(req.body.phone) : undefined;
 
   if (nextEmail && nextEmail !== user.email) {
     const exists = await User.findOne({
@@ -241,6 +262,17 @@ export async function updateProfile(req, res) {
 
     if (exists) {
       return sendError(res, 409, "Email already in use");
+    }
+  }
+
+  if (nextPhone !== undefined && nextPhone !== user.phone) {
+    const phoneExists = await User.findOne({
+      phone: nextPhone,
+      _id: { $ne: user._id },
+    }).lean();
+
+    if (phoneExists) {
+      return sendError(res, 409, "Phone number already in use");
     }
   }
 

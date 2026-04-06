@@ -1,64 +1,92 @@
-# UrbanSight Smart City Dashboard
+# UrbanFlow Connect
 
-UrbanSight is a role-based smart city water utility platform connecting citizens with utility staff across request intake, review, field workflow, payment verification, and administration.
+UrbanFlow Connect is a role-based water utility workflow platform that connects citizens and utility staff from application intake to final service completion.
 
-## Stack
+## Tech Stack
 
-- Frontend: React, TypeScript, Vite, TailwindCSS, shadcn/ui, Framer Motion
-- Backend: Node.js, Express, MongoDB, Mongoose, JWT, Cloudinary
-- Integrations: Google Maps, Cloudinary uploads
+- Frontend: React, TypeScript, Vite, Tailwind CSS, shadcn/ui
+- Backend: Node.js, Express, MongoDB, Mongoose, JWT
+- Integrations: Cloudinary (file uploads), SMTP (email), Google OAuth (optional)
 
 ## Roles
 
-- `citizen`
-- `director`
-- `coordinator`
-- `surveyor`
-- `technician`
-- `finance`
-- `admin`
+- citizen
+- director
+- coordinator
+- surveyor
+- technician
+- meter_reader
+- finance
+- admin
 
-## Features
+## Core Capabilities
 
-- Citizen registration and login
-- Staff login with seeded accounts
-- JWT authentication with httpOnly cookie support
-- Role-based protected routes
-- New water connection request submission
-- Ethiopian phone number validation
-- Google Maps location picking
-- Cloudinary file upload flow
-- Citizen request tracking with timeline
-- Director review and approval workflow
-- Coordinator assignment workflow
-- Surveyor inspection submission
-- Technician progress updates
-- Finance payment verification
-- Admin staff account creation and user management
+- Citizen new connection applications and issue reports
+- Full request workflow with role-based approvals, assignment, and completion
+- Adjustment-request loop (staff can request correction, citizen can edit and resubmit)
+- Configurable notifications by channel (in-app push/email)
+- Configurable notification templates per workflow step
+- Account creation notifications (push + email)
+- Reject flow with mandatory reason capture
+- Cross-account uniqueness checks for email/phone
+- Single active citizen application rule across request/issue flows
 
-## Project Structure
+## Project Layout
 
 ```text
-src/           Frontend application
-server/src/    Express API, models, routes, middleware
+backend/                Backend workspace
+backend/server/src/     API controllers, models, services, routes
+frontend/src/           React application
 ```
+
+## Package Manager
+
+This repository is configured for npm.
+
+- Keep: package-lock.json
+- Remove: bun.lock / bun.lockb / yarn.lock / pnpm-lock.yaml
+
+If VS Code still warns about multiple lockfiles, set npm.packageManager to npm instead of auto.
 
 ## Environment Setup
 
-Copy `.env.example` to `.env` and fill in the required values.
+The backend reads environment values from backend/.env first, then falls back to root .env.
+
+1. Copy backend/.env.example to backend/.env
+2. Fill required values
+
+Minimum required:
 
 ```env
-VITE_API_BASE_URL=http://localhost:5000/api
-VITE_GOOGLE_MAPS_API_KEY=
-
 PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/urbansight
 JWT_SECRET=change-this-secret
-JWT_EXPIRES_IN=1d
-CLIENT_ORIGIN=http://localhost:8080
+CLIENT_ORIGIN=http://localhost:5173
+```
+
+Common optional integrations:
+
+```env
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
+
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=
+SMTP_PASS=
+EMAIL_FROM=UrbanSight <no-reply@urbansight.local>
+
+OAUTH_GOOGLE_CLIENT_ID=
+OAUTH_GOOGLE_CLIENT_SECRET=
+OAUTH_GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+```
+
+Frontend optional env:
+
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
 ## Install
@@ -67,58 +95,66 @@ CLOUDINARY_API_SECRET=
 npm install
 ```
 
-## Run
+## Run Locally
 
-Frontend only:
+Start backend + citizen frontend:
 
 ```bash
 npm run dev
 ```
 
+Start backend + citizen frontend (explicit):
+
+```bash
+npm run dev:citizen
+```
+
+Start backend + backoffice frontend:
+
+```bash
+npm run dev:backoffice
+```
+
 Backend only:
 
 ```bash
-npm run dev:server
+npm run start
 ```
 
-Frontend and backend together:
-
-```bash
-npm run dev:full
-```
-
-Production build:
+## Build
 
 ```bash
 npm run build
+npm run build:citizen
+npm run build:backoffice
 ```
 
-## Seeded Staff Accounts
+## Testing and Quality
 
-The backend seeds default staff users on startup.
+```bash
+npm run lint
+npm run test:backend
+npm run test
+```
 
-- Admin: `admin@urbansight.local` / `admin123`
-- Director: `director@urbansight.local` / `director123`
-- Coordinator: `coordinator@urbansight.local` / `coord123`
-- Surveyor: `surveyor@urbansight.local` / `survey123`
-- Technician: `technician@urbansight.local` / `tech1234`
-- Finance: `finance@urbansight.local` / `finance123`
+## Notification Template Placeholders
 
-Citizens register from the `/register` page.
+Workflow templates support placeholders like:
 
-## Workflow
+- {{customerName}}
+- {{statusLabel}}
+- {{reason}}
+- {{waterConnectionCode}}
+- {{customerCode}}
 
-1. Citizen submits a new connection request.
-2. Request starts with status `submitted`.
-3. Director moves request to `under_review`, then approves or rejects.
-4. Coordinator assigns staff.
-5. Surveyor submits inspection details.
-6. Technician updates execution progress.
-7. Finance verifies payment and completes the request.
+Account creation templates support:
 
-## Current Notes
+- {{name}}
+- {{role}}
+- {{email}}
 
-- Google Maps requires `VITE_GOOGLE_MAPS_API_KEY`.
-- Cloudinary uploads require the three Cloudinary backend environment variables.
-- The frontend build currently succeeds.
-- Vite reports a large bundle warning; if needed, that can be addressed later with route-level code splitting.
+## Notes
+
+- Notification channel toggles and template management are available from the configuration page.
+- Citizens can edit request fields (including docs) when status is adjustment_requested and then resubmit.
+- Adjust the CORS origin list via CLIENT_ORIGIN or CLIENT_ORIGINS.

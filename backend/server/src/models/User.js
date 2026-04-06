@@ -3,7 +3,10 @@ import bcrypt from "bcryptjs";
 import { branches, roles } from "../utils/constants.js";
 
 const etPhoneRegex = /^(?:\+2519\d{8}|09\d{8}|07\d{8})$/;
-const normalizePhoneNumber = (value) => String(value ?? "").replace(/\s+/g, "").trim();
+const normalizePhoneNumber = (value) =>
+  String(value ?? "")
+    .replace(/\s+/g, "")
+    .trim();
 
 function isBranchRequiredRole(role) {
   return (
@@ -29,7 +32,8 @@ const userSchema = new mongoose.Schema(
       set: normalizePhoneNumber,
       validate: {
         validator: (value) => value === "" || etPhoneRegex.test(value),
-        message: "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX",
+        message:
+          "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX",
       },
     },
     role: {
@@ -56,6 +60,17 @@ const userSchema = new mongoose.Schema(
     lastLogin: { type: Date },
   },
   { timestamps: true },
+);
+
+// Allow multiple empty phone values, but enforce uniqueness for real numbers.
+userSchema.index(
+  { phone: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      phone: { $type: "string", $ne: "" },
+    },
+  },
 );
 
 userSchema.pre("save", async function hashPassword() {

@@ -13,6 +13,7 @@ export const branches = ["Sikela Branch", "Nech Sar Branch", "Secha Branch"];
 
 export const requestStatuses = [
   "submitted",
+  "adjustment_requested",
   "under_review",
   "rejected",
   "inspection",

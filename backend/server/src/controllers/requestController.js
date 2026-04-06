@@ -1,8 +1,13 @@
 import { NewConnectionRequest } from "../models/NewConnectionRequest.js";
+import { IssueReport } from "../models/IssueReport.js";
 import { Tool } from "../models/Tool.js";
 import { Configuration } from "../models/Configuration.js";
 import { User } from "../models/User.js";
-import { roles } from "../utils/constants.js";
+import {
+  roles,
+  terminalIssueStatuses,
+  terminalRequestStatuses,
+} from "../utils/constants.js";
 import { sendError, sendOk } from "../utils/response.js";
 import {
   appendWorkflowLog,
@@ -14,6 +19,7 @@ import {
 } from "../services/assignmentService.js";
 import { notificationService } from "../services/notificationService.js";
 import { uploadBufferToCloudinary } from "../services/cloudinaryUploadService.js";
+import { notifyCitizenRequestWorkflowStep } from "../services/workflowNotificationService.js";
 
 async function getRequiredTechniciansForCompletion() {
   try {
@@ -111,6 +117,18 @@ function transitionRequestStatus({
   });
 }
 
+async function notifyCitizenForRequestStep(requestDoc, status, reason = "") {
+  try {
+    await notifyCitizenRequestWorkflowStep({
+      requestDoc,
+      status,
+      reason,
+    });
+  } catch {
+    // Keep workflow operations non-blocking if notifications fail.
+  }
+}
+
 function branchCode(branch) {
   return String(branch || "")
     .split(" ")
@@ -180,6 +198,29 @@ async function resolveBranchCoordinator(requestDoc) {
 export async function createNewConnectionRequest(req, res) {
   if (!ensureActorIsActive(req, res)) return;
 
+  const [activeRequest, activeIssue] = await Promise.all([
+    NewConnectionRequest.findOne({
+      citizen: req.user._id,
+      status: { $nin: terminalRequestStatuses },
+    })
+      .select("_id")
+      .lean(),
+    IssueReport.findOne({
+      citizen: req.user._id,
+      status: { $nin: terminalIssueStatuses },
+    })
+      .select("_id")
+      .lean(),
+  ]);
+
+  if (activeRequest || activeIssue) {
+    return sendError(
+      res,
+      409,
+      "You already have an active application. Complete or close it before submitting a new one.",
+    );
+  }
+
   const doc = await NewConnectionRequest.create({
     ...req.body,
     citizen: req.user._id,
@@ -194,6 +235,8 @@ export async function createNewConnectionRequest(req, res) {
       },
     ],
   });
+
+  await notifyCitizenForRequestStep(doc, "submitted");
 
   return sendOk(res, { request: doc }, 201);
 }
@@ -337,6 +380,8 @@ export async function approveByDirector(req, res) {
     });
   }
 
+  await notifyCitizenForRequestStep(requestDoc, "under_review");
+
   return sendOk(res, { request: requestDoc });
 }
 
@@ -362,11 +407,11 @@ export async function rejectByDirector(req, res) {
 
   await requestDoc.save();
 
-  notificationService.notify({
-    recipientId: requestDoc.citizen,
-    message: "Your new connection request was rejected",
-    context: { requestId: requestDoc._id, service: "new_connection" },
-  });
+  await notifyCitizenForRequestStep(
+    requestDoc,
+    "rejected",
+    req.body.note || "",
+  );
 
   return sendOk(res, { request: requestDoc });
 }
@@ -407,7 +452,11 @@ export async function submitInspection(req, res) {
     .lean();
 
   if (toolCatalog.length !== uniqueToolIds.length) {
-    return sendError(res, 400, "One or more selected tools are invalid or inactive");
+    return sendError(
+      res,
+      400,
+      "One or more selected tools are invalid or inactive",
+    );
   }
 
   const toolById = new Map(toolCatalog.map((tool) => [String(tool._id), tool]));
@@ -470,12 +519,7 @@ export async function submitInspection(req, res) {
 
   await requestDoc.save();
 
-  await notificationService.notify({
-    recipientId: requestDoc.citizen,
-    message:
-      "Inspection completed. Please proceed with payment for required materials.",
-    context: { requestId: requestDoc._id, service: "new_connection" },
-  });
+  await notifyCitizenForRequestStep(requestDoc, "waiting_payment");
 
   return sendOk(res, { request: requestDoc });
 }
@@ -573,6 +617,8 @@ export async function submitPayment(req, res) {
     context: { requestId: requestDoc._id, service: "new_connection" },
   });
 
+  await notifyCitizenForRequestStep(requestDoc, "payment_submitted");
+
   return sendOk(res, { request: requestDoc });
 }
 
@@ -650,11 +696,7 @@ export async function verifyPayment(req, res) {
 
   await requestDoc.save();
 
-  await notificationService.notify({
-    recipientId: requestDoc.citizen,
-    message: "Your payment has been verified",
-    context: { requestId: requestDoc._id, service: "new_connection" },
-  });
+  await notifyCitizenForRequestStep(requestDoc, "under_review");
 
   return sendOk(res, { request: requestDoc });
 }
@@ -718,11 +760,11 @@ export async function rejectPayment(req, res) {
 
   await requestDoc.save();
 
-  await notificationService.notify({
-    recipientId: requestDoc.citizen,
-    message: `Payment rejected: ${req.body.rejectionReason}`,
-    context: { requestId: requestDoc._id, service: "new_connection" },
-  });
+  await notifyCitizenForRequestStep(
+    requestDoc,
+    "payment_rejected",
+    req.body.rejectionReason,
+  );
 
   return sendOk(res, { request: requestDoc });
 }
@@ -788,6 +830,8 @@ export async function approveByBranchOfficer(req, res) {
         context: { requestId: requestDoc._id, service: "new_connection" },
       });
 
+      await notifyCitizenForRequestStep(requestDoc, "inspection");
+
       return sendOk(res, { request: requestDoc });
     }
 
@@ -844,11 +888,7 @@ export async function approveByBranchOfficer(req, res) {
         ),
       );
 
-      await notificationService.notify({
-        recipientId: requestDoc.citizen,
-        message: "Implementation team assigned. Field work will start soon.",
-        context: { requestId: requestDoc._id, service: "new_connection" },
-      });
+      await notifyCitizenForRequestStep(requestDoc, "approved");
 
       return sendOk(res, { request: requestDoc });
     }
@@ -902,18 +942,13 @@ export async function approveByBranchOfficer(req, res) {
 
       await requestDoc.save();
 
-      await Promise.all([
-        notificationService.notify({
-          recipientId: assignedMeterReader,
-          message: "A completed connection has been assigned for meter reading",
-          context: { requestId: requestDoc._id, service: "new_connection" },
-        }),
-        notificationService.notify({
-          recipientId: requestDoc.citizen,
-          message: `Your application is approved and completed. Water Connection Code: ${requestDoc.waterConnectionCode} | Customer Code: ${requestDoc.customerCode}`,
-          context: { requestId: requestDoc._id, service: "new_connection" },
-        }),
-      ]);
+      await notificationService.notify({
+        recipientId: assignedMeterReader,
+        message: "A completed connection has been assigned for meter reading",
+        context: { requestId: requestDoc._id, service: "new_connection" },
+      });
+
+      await notifyCitizenForRequestStep(requestDoc, "completed");
 
       return sendOk(res, { request: requestDoc });
     }
@@ -936,7 +971,14 @@ export async function rejectByBranchOfficer(req, res) {
 
   if (!ensureStaffCanAccessRequestBranch(req, res, requestDoc)) return;
 
-  if (String(requestDoc.assignedBranchOfficer) !== String(req.user._id)) {
+  const isAssignedBranchOfficer =
+    requestDoc.assignedBranchOfficer &&
+    String(requestDoc.assignedBranchOfficer) === String(req.user._id);
+  const canRejectAsSenior = [roles.ADMIN, roles.DIRECTOR].includes(
+    req.user.role,
+  );
+
+  if (!isAssignedBranchOfficer && !canRejectAsSenior) {
     return sendError(
       res,
       403,
@@ -977,11 +1019,161 @@ export async function rejectByBranchOfficer(req, res) {
 
   await requestDoc.save();
 
-  await notificationService.notify({
-    recipientId: requestDoc.citizen,
-    message: "Your request was rejected by branch officer",
-    context: { requestId: requestDoc._id, service: "new_connection" },
-  });
+  await notifyCitizenForRequestStep(
+    requestDoc,
+    "rejected",
+    req.body.note || "",
+  );
+
+  return sendOk(res, { request: requestDoc });
+}
+
+export async function requestApplicationAdjustment(req, res) {
+  if (!ensureActorIsActive(req, res)) return;
+
+  const requestDoc = await getRequestOr404(req.params.id, res);
+  if (!requestDoc) return;
+
+  if (!ensureStaffCanAccessRequestBranch(req, res, requestDoc)) return;
+
+  const currentStatus = requestDoc.status;
+  const stage = requestDoc.branchApprovalStage || 0;
+  const actorRole = req.user.role;
+
+  const isCoordinatorTrack =
+    [roles.ADMIN, roles.DIRECTOR, roles.COORDINATOR].includes(actorRole) &&
+    (currentStatus === "submitted" ||
+      (currentStatus === "under_review" && stage === 0) ||
+      currentStatus === "payment_verified");
+  const isFinanceTrack =
+    actorRole === roles.FINANCE &&
+    ["payment_submitted", "payment_verified"].includes(currentStatus);
+
+  if (!isCoordinatorTrack && !isFinanceTrack) {
+    return sendError(
+      res,
+      400,
+      "Adjustment can only be requested at submission, first branch review, or payment review stages",
+    );
+  }
+
+  if (
+    currentStatus === "under_review" &&
+    requestDoc.assignedBranchOfficer &&
+    actorRole === roles.COORDINATOR &&
+    String(requestDoc.assignedBranchOfficer) !== String(req.user._id)
+  ) {
+    return sendError(
+      res,
+      403,
+      "Only the assigned branch officer can request adjustment at this stage",
+    );
+  }
+
+  if (
+    currentStatus === "payment_submitted" &&
+    requestDoc.assignedFinanceOfficer &&
+    actorRole === roles.FINANCE &&
+    String(requestDoc.assignedFinanceOfficer) !== String(req.user._id)
+  ) {
+    return sendError(
+      res,
+      403,
+      "Only the assigned finance officer can request adjustment at this stage",
+    );
+  }
+
+  const reason = req.body.reason;
+
+  try {
+    transitionRequestStatus({
+      requestDoc,
+      nextStatus: "adjustment_requested",
+      action: "adjustment_requested",
+      note: reason,
+      req,
+      meta: { returnStatus: currentStatus },
+    });
+  } catch (error) {
+    return sendError(res, 400, error.message);
+  }
+
+  requestDoc.adjustment = {
+    requested: true,
+    reason,
+    requestedBy: req.user._id,
+    requestedByRole: req.user.role,
+    requestedAt: new Date(),
+    returnStatus: currentStatus,
+  };
+
+  await requestDoc.save();
+  await notifyCitizenForRequestStep(requestDoc, "adjustment_requested", reason);
+
+  return sendOk(res, { request: requestDoc });
+}
+
+export async function resubmitAdjustedRequest(req, res) {
+  if (!ensureActorIsActive(req, res)) return;
+
+  const requestDoc = await getRequestOr404(req.params.id, res);
+  if (!requestDoc) return;
+
+  if (!ensureCitizenOwnsRequest(req, res, requestDoc)) return;
+
+  if (requestDoc.status !== "adjustment_requested") {
+    return sendError(res, 400, "Request is not waiting for adjustments");
+  }
+
+  const corrections = req.body.corrections || {};
+  const editableFields = new Set([
+    "customerName",
+    "customerNameAmharic",
+    "email",
+    "tinNumber",
+    "phoneNumber",
+    "numberOfFamily",
+    "address",
+    "houseNumberZone",
+    "readingZone",
+    "meterSize",
+    "customerGroup",
+    "type",
+    "branch",
+    "location",
+    "housePlan",
+    "idCard",
+    "description",
+    "attachments",
+  ]);
+
+  for (const [field, value] of Object.entries(corrections)) {
+    if (editableFields.has(field) && value !== undefined) {
+      requestDoc[field] = value;
+    }
+  }
+
+  const returnStatus = requestDoc.adjustment?.returnStatus || "submitted";
+  try {
+    transitionRequestStatus({
+      requestDoc,
+      nextStatus: returnStatus,
+      action: "adjustment_resubmitted",
+      note: req.body.note || "Citizen resubmitted after requested adjustments",
+      req,
+      meta: { returnStatus },
+    });
+  } catch (error) {
+    return sendError(res, 400, error.message);
+  }
+
+  requestDoc.adjustment = {
+    requested: false,
+    reason: "",
+  };
+
+  await requestDoc.save();
+  await notifyCitizenForRequestStep(requestDoc, returnStatus);
 
   return sendOk(res, { request: requestDoc });
 }
@@ -1140,7 +1332,10 @@ export async function completeImplementation(req, res) {
   if (alreadyCompleted) {
     const technicianCount = requestDoc.assignedTechnicians.length;
     const completedTechnicians = completion.technicianCompletions.length;
-    const pendingTechnicians = Math.max(technicianCount - completedTechnicians, 0);
+    const pendingTechnicians = Math.max(
+      technicianCount - completedTechnicians,
+      0,
+    );
 
     return sendOk(res, {
       request: requestDoc,

@@ -5,19 +5,19 @@ import { branches, roles } from "../utils/constants.js";
 export const etPhoneRegex = /^(?:\+2519\d{8}|09\d{8}|07\d{8})$/;
 export const etPhoneMessage =
   "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX";
-const normalizePhoneNumber = (value) => String(value ?? "").replace(/\s+/g, "").trim();
+const normalizePhoneNumber = (value) =>
+  String(value ?? "")
+    .replace(/\s+/g, "")
+    .trim();
 const requiredPhoneSchema = z
   .string()
   .transform(normalizePhoneNumber)
   .refine((value) => etPhoneRegex.test(value), etPhoneMessage);
-const optionalPhoneSchema = z.preprocess(
-  (value) => {
-    if (value === undefined || value === null) return undefined;
-    const normalized = normalizePhoneNumber(value);
-    return normalized === "" ? undefined : normalized;
-  },
-  z.string().regex(etPhoneRegex, etPhoneMessage).optional(),
-);
+const optionalPhoneSchema = z.preprocess((value) => {
+  if (value === undefined || value === null) return undefined;
+  const normalized = normalizePhoneNumber(value);
+  return normalized === "" ? undefined : normalized;
+}, z.string().regex(etPhoneRegex, etPhoneMessage).optional());
 export const amharicNameRegex = /^[\u1200-\u137F\s]+$/;
 const readingZoneEnum = z.enum([
   "Water Source Kebele",
@@ -174,7 +174,12 @@ export const updateToolSchema = z
 
 const configurationWorkflowSchema = z
   .object({
-    requiredTechniciansForCompletion: z.coerce.number().int().min(1).max(10).optional(),
+    requiredTechniciansForCompletion: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .optional(),
     autoAssignSurveyor: z.boolean().optional(),
     autoAssignTechnicians: z.boolean().optional(),
     autoAssignMeterReader: z.boolean().optional(),
@@ -185,7 +190,10 @@ const configurationPaymentsSchema = z
   .object({
     requireReceiptUpload: z.boolean().optional(),
     allowResubmissionAfterRejection: z.boolean().optional(),
-    supportedMethods: z.array(z.string().trim().min(2).max(120)).max(80).optional(),
+    supportedMethods: z
+      .array(z.string().trim().min(2).max(120))
+      .max(80)
+      .optional(),
   })
   .optional();
 
@@ -200,6 +208,26 @@ const configurationNotificationsSchema = z
   .object({
     notifyCitizenOnStatusChange: z.boolean().optional(),
     notifyAssigneeOnAutoAssignment: z.boolean().optional(),
+    enablePush: z.boolean().optional(),
+    enableEmail: z.boolean().optional(),
+    accountCreationTemplate: z
+      .object({
+        push: z.string().max(500).optional(),
+        email: z.string().max(1000).optional(),
+      })
+      .optional(),
+    workflowStepTemplates: z
+      .object({
+        new_connection: z
+          .record(
+            z.object({
+              push: z.string().max(500).optional(),
+              email: z.string().max(1000).optional(),
+            }),
+          )
+          .optional(),
+      })
+      .optional(),
   })
   .optional();
 
@@ -236,6 +264,15 @@ export const paymentSubmissionSchema = z.object({
 
 export const paymentVerificationSchema = z.object({
   note: z.string().max(500).optional(),
+});
+
+export const adjustmentRequestSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const adjustmentResubmissionSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+  corrections: z.record(z.any()).optional(),
 });
 
 export const paymentRejectionSchema = z.object({
@@ -287,7 +324,10 @@ export const newConnectionSchema = z.object({
     .trim()
     .min(2, "Customer name in Amharic must be at least 2 characters")
     .max(80, "Customer name in Amharic must not exceed 80 characters")
-    .regex(amharicNameRegex, "Customer name in Amharic must use Amharic letters only"),
+    .regex(
+      amharicNameRegex,
+      "Customer name in Amharic must use Amharic letters only",
+    ),
   email: z.string().email("Enter a valid email address"),
   tinNumber: z
     .string()
@@ -346,14 +386,7 @@ export const newConnectionSchema = z.object({
     "Regional and Federal Institution",
     "Local Government",
   ]),
-  type: z.enum([
-    "Private",
-    "Shared",
-    "Tap",
-    "Hydrant",
-    "Cattle Drink",
-    "Well",
-  ]),
+  type: z.enum(["Private", "Shared", "Tap", "Hydrant", "Cattle Drink", "Well"]),
   serviceType: z.string().default("New Water Connection"),
   description: z
     .string()
@@ -363,13 +396,11 @@ export const newConnectionSchema = z.object({
     .default(""),
   branch: branchEnum,
   location: z.object({
-    latitude: z
-      .coerce
+    latitude: z.coerce
       .number()
       .min(3, "Latitude must be within Ethiopia")
       .max(15, "Latitude must be within Ethiopia"),
-    longitude: z
-      .coerce
+    longitude: z.coerce
       .number()
       .min(33, "Longitude must be within Ethiopia")
       .max(48, "Longitude must be within Ethiopia"),

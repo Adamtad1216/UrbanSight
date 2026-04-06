@@ -61,6 +61,16 @@ describe("Branch-based new connection workflow", () => {
       firstLogin: false,
     });
 
+    state.users.citizenTwo = await User.create({
+      name: "Citizen User Two",
+      email: "citizen.two@test.com",
+      password: "password123",
+      phone: "0911000021",
+      role: roles.CITIZEN,
+      status: "active",
+      firstLogin: false,
+    });
+
     state.users.directorSikela = await User.create({
       name: "Director Sikela",
       email: "director.sikela@test.com",
@@ -162,7 +172,9 @@ describe("Branch-based new connection workflow", () => {
 
     const loginAs = async (email, portal = "citizen") => {
       const endpoint =
-        portal === "staff" ? "/api/auth/login-staff" : "/api/auth/login-citizen";
+        portal === "staff"
+          ? "/api/auth/login-staff"
+          : "/api/auth/login-citizen";
 
       const response = await request(app).post(endpoint).send({
         email,
@@ -174,6 +186,7 @@ describe("Branch-based new connection workflow", () => {
 
     state.tokens.admin = await loginAs("admin@test.com", "staff");
     state.tokens.citizen = await loginAs("citizen@test.com", "citizen");
+    state.tokens.citizenTwo = await loginAs("citizen.two@test.com", "citizen");
     state.tokens.directorSikela = await loginAs(
       "director.sikela@test.com",
       "staff",
@@ -186,12 +199,18 @@ describe("Branch-based new connection workflow", () => {
       "surveyor.sikela@test.com",
       "staff",
     );
-    state.tokens.surveyorSecha = await loginAs("surveyor.secha@test.com", "staff");
+    state.tokens.surveyorSecha = await loginAs(
+      "surveyor.secha@test.com",
+      "staff",
+    );
     state.tokens.surveyorSikelaBackup = await loginAs(
       "surveyor.sikela.backup@test.com",
       "staff",
     );
-    state.tokens.financeSikela = await loginAs("finance.sikela@test.com", "staff");
+    state.tokens.financeSikela = await loginAs(
+      "finance.sikela@test.com",
+      "staff",
+    );
     state.tokens.coordinatorSecha = await loginAs(
       "coordinator.secha@test.com",
       "staff",
@@ -243,16 +262,24 @@ describe("Branch-based new connection workflow", () => {
     jest.restoreAllMocks();
   });
 
-  async function submitRequest(branch = "Sikela Branch") {
+  async function submitRequest(
+    branch = "Sikela Branch",
+    {
+      token = state.tokens.citizen,
+      customerName = "Citizen User",
+      email = "citizen@test.com",
+      phoneNumber = "0911000001",
+    } = {},
+  ) {
     const response = await request(app)
       .post("/api/requests/new-connection")
-      .set("Authorization", `Bearer ${state.tokens.citizen}`)
+      .set("Authorization", `Bearer ${token}`)
       .send({
-        customerName: "Citizen User",
+        customerName,
         customerNameAmharic: "አዳም ታደሰ",
-        email: "citizen@test.com",
+        email,
         tinNumber: "1234567890",
-        phoneNumber: "0911000001",
+        phoneNumber,
         numberOfFamily: 5,
         address: "Arba Minch",
         houseNumberZone: "HZ-1",
@@ -342,7 +369,12 @@ describe("Branch-based new connection workflow", () => {
 
   it("filters request list by staff branch", async () => {
     await submitRequest("Sikela Branch");
-    const sechaRequest = await submitRequest("Secha Branch");
+    const sechaRequest = await submitRequest("Secha Branch", {
+      token: state.tokens.citizenTwo,
+      customerName: "Citizen User Two",
+      email: "citizen.two@test.com",
+      phoneNumber: "0911000021",
+    });
     await approveRequestByDirector(
       sechaRequest.body.request._id,
       state.tokens.directorSecha,
@@ -400,10 +432,12 @@ describe("Branch-based new connection workflow", () => {
     const notification = await Notification.findOne({
       userId: state.users.citizen._id,
       requestId,
-    }).lean();
+    })
+      .sort({ createdAt: -1 })
+      .lean();
     expect(notification).toBeTruthy();
     expect(notification.read).toBe(false);
-    expect(notification.message).toContain("Inspection completed");
+    expect(notification.message).toContain("Inspection is complete");
   });
 
   it("blocks unauthorized role from submitting inspection", async () => {

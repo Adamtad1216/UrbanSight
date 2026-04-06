@@ -1,6 +1,10 @@
 import { IssueReport } from "../models/IssueReport.js";
 import { NewConnectionRequest } from "../models/NewConnectionRequest.js";
-import { roles } from "../utils/constants.js";
+import {
+  roles,
+  terminalIssueStatuses,
+  terminalRequestStatuses,
+} from "../utils/constants.js";
 import { sendError, sendOk } from "../utils/response.js";
 import {
   appendWorkflowLog,
@@ -76,6 +80,29 @@ function transitionIssueStatus({ issue, nextStatus, action, note, req, meta }) {
 
 export async function createIssue(req, res) {
   if (!ensureActorIsActive(req, res)) return;
+
+  const [activeRequest, activeIssue] = await Promise.all([
+    NewConnectionRequest.findOne({
+      citizen: req.user._id,
+      status: { $nin: terminalRequestStatuses },
+    })
+      .select("_id")
+      .lean(),
+    IssueReport.findOne({
+      citizen: req.user._id,
+      status: { $nin: terminalIssueStatuses },
+    })
+      .select("_id")
+      .lean(),
+  ]);
+
+  if (activeRequest || activeIssue) {
+    return sendError(
+      res,
+      409,
+      "You already have an active application. Complete or close it before submitting a new one.",
+    );
+  }
 
   const waterConnectionCode = String(req.body.waterConnectionCode || "")
     .trim()
@@ -267,7 +294,14 @@ export async function rejectIssue(req, res) {
 
   if (!ensureStaffCanAccessIssueBranch(req, res, issue)) return;
 
-  if (String(issue.assignedBranchOfficer) !== String(req.user._id)) {
+  const isAssignedBranchOfficer =
+    issue.assignedBranchOfficer &&
+    String(issue.assignedBranchOfficer) === String(req.user._id);
+  const canRejectAsSenior = [roles.ADMIN, roles.DIRECTOR].includes(
+    req.user.role,
+  );
+
+  if (!isAssignedBranchOfficer && !canRejectAsSenior) {
     return sendError(
       res,
       403,

@@ -1,13 +1,32 @@
 import { issueStatuses, requestStatuses } from "../utils/constants.js";
 
 const newConnectionAllowedTransitions = {
-  submitted: ["under_review", "rejected"],
-  under_review: ["inspection", "waiting_payment", "approved", "rejected"],
+  submitted: ["under_review", "adjustment_requested", "rejected"],
+  adjustment_requested: [
+    "submitted",
+    "under_review",
+    "inspection",
+    "waiting_payment",
+    "payment_submitted",
+    "payment_verified",
+    "approved",
+  ],
+  under_review: [
+    "inspection",
+    "waiting_payment",
+    "approved",
+    "adjustment_requested",
+    "rejected",
+  ],
   inspection: ["waiting_payment", "payment_submitted"],
   waiting_payment: ["payment_submitted"],
-  payment_submitted: ["under_review", "payment_rejected"],
+  payment_submitted: [
+    "under_review",
+    "payment_rejected",
+    "adjustment_requested",
+  ],
   payment_rejected: ["payment_submitted"],
-  payment_verified: ["approved", "under_review"],
+  payment_verified: ["approved", "under_review", "adjustment_requested"],
   approved: ["completed"],
   completed: [],
   rejected: [],

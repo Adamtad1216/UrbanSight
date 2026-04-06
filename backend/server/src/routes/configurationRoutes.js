@@ -31,7 +31,7 @@ router.get(
 router.patch(
   "/",
   authenticate,
-  authorize(roles.ADMIN, roles.DIRECTOR),
+  authorize(roles.ADMIN, roles.DIRECTOR, roles.COORDINATOR),
   validateBody(updateConfigurationSchema),
   updateConfiguration,
 );

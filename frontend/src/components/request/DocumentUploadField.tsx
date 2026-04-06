@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Eye,
   FileText,
@@ -57,6 +57,30 @@ export function DocumentUploadField({
         }
       : null,
   );
+
+  useEffect(() => {
+    if (!valueUrl) {
+      setDocumentState(null);
+      return;
+    }
+
+    setDocumentState((previous) => {
+      if (previous?.url === valueUrl) {
+        return previous;
+      }
+
+      return {
+        fileName: previous?.fileName || label,
+        size: previous?.url === valueUrl ? previous.size : 0,
+        url: valueUrl,
+        kind: getDocumentKind(valueUrl),
+      };
+    });
+  }, [label, valueUrl]);
+
+  const normalizedLabel = label.trim();
+  const shouldAppendRequired =
+    Boolean(required) && !/\(\s*required\s*\)/i.test(normalizedLabel);
 
   const openFilePicker = () => {
     inputRef.current?.click();
@@ -121,8 +145,8 @@ export function DocumentUploadField({
   return (
     <div className="space-y-2">
       <Label>
-        {label}
-        {required ? " (required)" : ""}
+        {normalizedLabel}
+        {shouldAppendRequired ? " (required)" : ""}
       </Label>
 
       <input

@@ -44,7 +44,11 @@ import { Tool } from "@/types/tool";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -140,9 +144,16 @@ export default function ServiceRequestsPage() {
   const [inspectionTools, setInspectionTools] = useState<InspectionToolDraft[]>(
     [emptyToolDraft()],
   );
+  const [adjustmentReason, setAdjustmentReason] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectTarget, setRejectTarget] = useState<
+    "director" | "branch" | null
+  >(null);
   const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [loadingTools, setLoadingTools] = useState(false);
-  const [openToolPickerRow, setOpenToolPickerRow] = useState<number | null>(null);
+  const [openToolPickerRow, setOpenToolPickerRow] = useState<number | null>(
+    null,
+  );
 
   const currentUserId = asUserId(
     user?.id || (user as unknown as { _id?: string })?._id,
@@ -173,6 +184,47 @@ export default function ServiceRequestsPage() {
   const canRejectByBranch =
     selected?.status === "under_review" && selectedBranchApprovalStage <= 1;
 
+  const canRequestAdjustment = useMemo(() => {
+    if (!selected || !user?.role) return false;
+
+    const stage = selected.branchApprovalStage || 0;
+    const role = user.role;
+
+    const isCoordinatorTrack =
+      ["admin", "director", "coordinator"].includes(role) &&
+      (selected.status === "submitted" ||
+        (selected.status === "under_review" && stage === 0) ||
+        selected.status === "payment_verified");
+
+    const isFinanceTrack =
+      role === "finance" &&
+      ["payment_submitted", "payment_verified"].includes(selected.status);
+
+    if (!isCoordinatorTrack && !isFinanceTrack) {
+      return false;
+    }
+
+    // Match backend authorization rule for assigned branch reviewer.
+    if (
+      role === "coordinator" &&
+      selected.status === "under_review" &&
+      asUserId(selected.assignedBranchOfficer)
+    ) {
+      return asUserId(selected.assignedBranchOfficer) === currentUserId;
+    }
+
+    // Match backend authorization rule for assigned finance reviewer.
+    if (
+      role === "finance" &&
+      selected.status === "payment_submitted" &&
+      asUserId(selected.assignedFinanceOfficer)
+    ) {
+      return asUserId(selected.assignedFinanceOfficer) === currentUserId;
+    }
+
+    return true;
+  }, [currentUserId, selected, user?.role]);
+
   useEffect(() => {
     if (!selected) return;
 
@@ -194,6 +246,7 @@ export default function ServiceRequestsPage() {
     }
 
     setInspectionTools([emptyToolDraft()]);
+    setAdjustmentReason(selected.adjustment?.reason || "");
   }, [selected]);
 
   const updateInspectionTool = (
@@ -333,12 +386,14 @@ export default function ServiceRequestsPage() {
       const assignedTechnicianIds = (requestDoc.assignedTechnicians || []).map(
         asUserId,
       );
-      const assignedTechnicianCount = requestDoc.assignedTechnicians?.length || 0;
+      const assignedTechnicianCount =
+        requestDoc.assignedTechnicians?.length || 0;
       const completedTechnicianCount =
         requestDoc.implementationCompletion?.technicianCompletions?.length || 0;
       const isReadyForBranchFinalApproval =
         requestDoc.workflowLogs?.some(
-          (entry) => entry.action === "implementation_ready_for_final_branch_approval",
+          (entry) =>
+            entry.action === "implementation_ready_for_final_branch_approval",
         ) || false;
       const assignedFinanceId = asUserId(requestDoc.assignedFinanceOfficer);
       const assignedMeterReaderId = asUserId(requestDoc.assignedMeterReader);
@@ -459,30 +514,79 @@ export default function ServiceRequestsPage() {
     );
   };
 
-  const rejectByDirector = async () => {
+  const rejectByDirector = async (reason: string) => {
     if (!selected) return;
     await runRequestAction(
       `/requests/request/${selected._id}/reject`,
-      { note: "Director rejected request" },
+      { note: reason },
       "Request rejected successfully.",
       "Action failed",
     );
   };
 
-  const rejectByBranchOfficer = async () => {
+  const rejectByBranchOfficer = async (reason: string) => {
     if (!selected) return;
     await runRequestAction(
       `/requests/request/${selected._id}/branch-officer/reject`,
-      { note: "Branch officer rejected request" },
+      { note: reason },
       "Request rejected successfully.",
       "Action failed",
+    );
+  };
+
+  const openRejectModal = (target: "director" | "branch") => {
+    setRejectTarget(target);
+    setRejectReason("");
+  };
+
+  const confirmReject = async () => {
+    const reason = rejectReason.trim();
+    if (reason.length < 3) {
+      toast({
+        title: "Reject reason required",
+        description: "Please provide at least 3 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (rejectTarget === "director") {
+      await rejectByDirector(reason);
+    } else if (rejectTarget === "branch") {
+      await rejectByBranchOfficer(reason);
+    }
+
+    setRejectTarget(null);
+    setRejectReason("");
+  };
+
+  const requestAdjustment = async () => {
+    if (!selected) return;
+
+    const reason = adjustmentReason.trim();
+    if (reason.length < 3) {
+      toast({
+        title: "Adjustment reason required",
+        description: "Please provide at least 3 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await runRequestAction(
+      `/requests/request/${selected._id}/adjustment-request`,
+      { reason },
+      "Adjustment requested successfully.",
+      "Adjustment request failed",
     );
   };
 
   const submitInspection = async () => {
     if (!selected) return;
 
-    const selectedTools = inspectionTools.filter((tool) => tool.toolId.trim().length > 0);
+    const selectedTools = inspectionTools.filter(
+      (tool) => tool.toolId.trim().length > 0,
+    );
 
     if (selectedTools.length === 0) {
       toast({
@@ -503,7 +607,8 @@ export default function ServiceRequestsPage() {
     if (hasInvalidTools) {
       toast({
         title: "Invalid tools",
-        description: "Please select active tools and set quantity greater than 0.",
+        description:
+          "Please select active tools and set quantity greater than 0.",
         variant: "destructive",
       });
       return;
@@ -535,15 +640,16 @@ export default function ServiceRequestsPage() {
   const submitTechnicalUpdate = async () => {
     if (!selected) return;
 
-    const assignedTechnicianIds = (selected.assignedTechnicians || []).map(asUserId);
+    const assignedTechnicianIds = (selected.assignedTechnicians || []).map(
+      asUserId,
+    );
     const completedTechnicianIds =
       selected.implementationCompletion?.technicianCompletions?.map((entry) =>
         asUserId(entry.technician),
       ) || [];
 
-    const alreadyCompletedByCurrentTechnician = completedTechnicianIds.includes(
-      currentUserId,
-    );
+    const alreadyCompletedByCurrentTechnician =
+      completedTechnicianIds.includes(currentUserId);
 
     if (alreadyCompletedByCurrentTechnician) {
       const pending = Math.max(
@@ -574,9 +680,11 @@ export default function ServiceRequestsPage() {
       await loadRequests();
       setSelected(response.request);
 
-      const totalTechnicians = response.request.assignedTechnicians?.length || 0;
+      const totalTechnicians =
+        response.request.assignedTechnicians?.length || 0;
       const completedTechnicians =
-        response.request.implementationCompletion?.technicianCompletions?.length || 0;
+        response.request.implementationCompletion?.technicianCompletions
+          ?.length || 0;
       const pending = Math.max(totalTechnicians - completedTechnicians, 0);
 
       if (pending > 0) {
@@ -612,7 +720,8 @@ export default function ServiceRequestsPage() {
       requestDoc.implementationCompletion?.technicianCompletions?.length || 0;
     const isReadyForBranchFinalApproval =
       requestDoc.workflowLogs?.some(
-        (entry) => entry.action === "implementation_ready_for_final_branch_approval",
+        (entry) =>
+          entry.action === "implementation_ready_for_final_branch_approval",
       ) || false;
     const assignedSurveyorId = asUserId(requestDoc.assignedSurveyor);
     const assignedFinanceId = asUserId(requestDoc.assignedFinanceOfficer);
@@ -878,13 +987,37 @@ export default function ServiceRequestsPage() {
                         size="sm"
                         variant="outline"
                         className="gap-1 text-destructive"
-                        onClick={rejectByDirector}
+                        onClick={() => openRejectModal("director")}
                       >
                         {" "}
                         <XCircle className="h-4 w-4" /> Reject
                       </Button>
                     </div>
                   )}
+
+                {canRequestAdjustment && (
+                  <div className="space-y-2 border rounded-lg p-3">
+                    <Label className="text-sm">Request Adjustment</Label>
+                    <Textarea
+                      value={adjustmentReason}
+                      onChange={(event) =>
+                        setAdjustmentReason(event.target.value)
+                      }
+                      placeholder="Write the adjustment reason for the citizen"
+                      rows={3}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        onClick={requestAdjustment}
+                      >
+                        <XCircle className="h-4 w-4" /> Ask Adjustment
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {isBranchApproverRole &&
                   isAssignedBranchReviewer &&
@@ -915,7 +1048,7 @@ export default function ServiceRequestsPage() {
                           size="sm"
                           variant="outline"
                           className="gap-1 text-destructive"
-                          onClick={rejectByBranchOfficer}
+                          onClick={() => openRejectModal("branch")}
                         >
                           <XCircle className="h-4 w-4" /> Reject
                         </Button>
@@ -965,7 +1098,10 @@ export default function ServiceRequestsPage() {
                             tool.quantity * tool.customerUnitPrice;
                           const selectedToolIds = new Set(
                             inspectionTools
-                              .filter((row, rowIndex) => rowIndex !== index && row.toolId)
+                              .filter(
+                                (row, rowIndex) =>
+                                  rowIndex !== index && row.toolId,
+                              )
                               .map((row) => row.toolId),
                           );
                           return (
@@ -993,33 +1129,45 @@ export default function ServiceRequestsPage() {
                                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-[420px] p-0" align="start">
+                                  <PopoverContent
+                                    className="w-[420px] p-0"
+                                    align="start"
+                                  >
                                     <Command>
                                       <CommandInput placeholder="Search tools (e.g. PVC)..." />
                                       <CommandList>
                                         <CommandEmpty>
-                                          {loadingTools ? "Loading tools..." : "No tool found."}
+                                          {loadingTools
+                                            ? "Loading tools..."
+                                            : "No tool found."}
                                         </CommandEmpty>
                                         <CommandGroup>
                                           {availableTools.map((catalogTool) => (
                                             <CommandItem
                                               key={catalogTool._id}
                                               value={`${catalogTool.code} ${catalogTool.description} ${catalogTool.source}`}
-                                              disabled={selectedToolIds.has(catalogTool._id)}
+                                              disabled={selectedToolIds.has(
+                                                catalogTool._id,
+                                              )}
                                               onSelect={() =>
-                                                selectInspectionTool(index, catalogTool)
+                                                selectInspectionTool(
+                                                  index,
+                                                  catalogTool,
+                                                )
                                               }
                                             >
                                               <Check
                                                 className={cn(
                                                   "mr-2 h-4 w-4",
-                                                  tool.toolId === catalogTool._id
+                                                  tool.toolId ===
+                                                    catalogTool._id
                                                     ? "opacity-100"
                                                     : "opacity-0",
                                                 )}
                                               />
                                               <span className="truncate">
-                                                {catalogTool.code} - {catalogTool.description}
+                                                {catalogTool.code} -{" "}
+                                                {catalogTool.description}
                                               </span>
                                             </CommandItem>
                                           ))}
@@ -1099,52 +1247,102 @@ export default function ServiceRequestsPage() {
                   </div>
                 )}
 
-                {user?.role === "technician" && hasCompletableTask(selected) && (
-                  <div className="space-y-2">
-                    {(() => {
-                      const assignedTechnicianIds =
-                        (selected.assignedTechnicians || []).map(asUserId);
-                      const completedTechnicianIds =
-                        selected.implementationCompletion?.technicianCompletions?.map(
-                          (entry) => asUserId(entry.technician),
-                        ) || [];
-                      const alreadyCompletedByCurrentTechnician = completedTechnicianIds.includes(
-                        currentUserId,
-                      );
-                      const pending = Math.max(
-                        assignedTechnicianIds.length - completedTechnicianIds.length,
-                        0,
-                      );
+                {user?.role === "technician" &&
+                  hasCompletableTask(selected) && (
+                    <div className="space-y-2">
+                      {(() => {
+                        const assignedTechnicianIds = (
+                          selected.assignedTechnicians || []
+                        ).map(asUserId);
+                        const completedTechnicianIds =
+                          selected.implementationCompletion?.technicianCompletions?.map(
+                            (entry) => asUserId(entry.technician),
+                          ) || [];
+                        const alreadyCompletedByCurrentTechnician =
+                          completedTechnicianIds.includes(currentUserId);
+                        const pending = Math.max(
+                          assignedTechnicianIds.length -
+                            completedTechnicianIds.length,
+                          0,
+                        );
 
-                      return (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={submitTechnicalUpdate}
-                            disabled={alreadyCompletedByCurrentTechnician}
-                          >
-                            {alreadyCompletedByCurrentTechnician
-                              ? "Submitted"
-                              : "Update Technical Progress"}
-                          </Button>
-                          {alreadyCompletedByCurrentTechnician && pending > 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              Waiting for second technician approval.
-                            </p>
-                          )}
-                          {alreadyCompletedByCurrentTechnician && pending === 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              All technicians approved. Waiting branch officer final approval.
-                            </p>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
+                        return (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={submitTechnicalUpdate}
+                              disabled={alreadyCompletedByCurrentTechnician}
+                            >
+                              {alreadyCompletedByCurrentTechnician
+                                ? "Submitted"
+                                : "Update Technical Progress"}
+                            </Button>
+                            {alreadyCompletedByCurrentTechnician &&
+                              pending > 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  Waiting for second technician approval.
+                                </p>
+                              )}
+                            {alreadyCompletedByCurrentTechnician &&
+                              pending === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  All technicians approved. Waiting branch
+                                  officer final approval.
+                                </p>
+                              )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={rejectTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRejectTarget(null);
+            setRejectReason("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reject Application</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="reject-reason">Reason</Label>
+            <Textarea
+              id="reject-reason"
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              rows={4}
+              placeholder="Write rejection reason for the citizen"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setRejectTarget(null);
+                  setRejectReason("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={confirmReject}
+              >
+                Confirm Reject
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

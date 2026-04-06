@@ -26,7 +26,11 @@ function getCurrentStepIndex(
     return 0;
   }
 
-  if (status === "submitted" || status === "rejected") {
+  if (
+    status === "submitted" ||
+    status === "adjustment_requested" ||
+    status === "rejected"
+  ) {
     return 0;
   }
 
@@ -71,7 +75,10 @@ export function ApplicationProgressTimeline({
           const isCurrent = index === currentIndex;
 
           return (
-            <div key={step} className="relative flex items-center gap-2 sm:flex-col sm:items-start">
+            <div
+              key={step}
+              className="relative flex items-center gap-2 sm:flex-col sm:items-start"
+            >
               <div className="flex items-center gap-2 sm:w-full">
                 <span
                   className={[
@@ -83,14 +90,20 @@ export function ApplicationProgressTimeline({
                         : "border-border bg-muted/40 text-muted-foreground",
                   ].join(" ")}
                 >
-                  {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                  {isCompleted ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    index + 1
+                  )}
                 </span>
                 <span className="text-xs font-medium sm:hidden">{step}</span>
               </div>
               <span
                 className={[
                   "hidden text-xs sm:block",
-                  isCurrent ? "font-semibold text-foreground" : "text-muted-foreground",
+                  isCurrent
+                    ? "font-semibold text-foreground"
+                    : "text-muted-foreground",
                 ].join(" ")}
               >
                 {step}

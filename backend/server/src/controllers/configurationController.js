@@ -1,63 +1,15 @@
 import { Configuration } from "../models/Configuration.js";
+import {
+  DEFAULT_CONFIGURATION,
+  mergeConfiguration,
+} from "../config/defaultConfiguration.js";
 import { sendError, sendOk } from "../utils/response.js";
 
 const CONFIG_KEY = "global";
 
-const DEFAULT_CONFIGURATION = {
-  workflow: {
-    requiredTechniciansForCompletion: 2,
-    autoAssignSurveyor: true,
-    autoAssignTechnicians: true,
-    autoAssignMeterReader: true,
-  },
-  payments: {
-    requireReceiptUpload: true,
-    allowResubmissionAfterRejection: true,
-    supportedMethods: [],
-  },
-  tools: {
-    maxImportFileSizeMb: 5,
-    updateDuplicateCodeOnImport: true,
-  },
-  notifications: {
-    notifyCitizenOnStatusChange: true,
-    notifyAssigneeOnAutoAssignment: true,
-  },
-  citizenPortal: {
-    showAssignedMeterReaderInfo: true,
-  },
-};
-
-function mergeConfig(base, override) {
-  return {
-    workflow: {
-      ...base.workflow,
-      ...(override?.workflow || {}),
-    },
-    payments: {
-      ...base.payments,
-      ...(override?.payments || {}),
-    },
-    tools: {
-      ...base.tools,
-      ...(override?.tools || {}),
-    },
-    notifications: {
-      ...base.notifications,
-      ...(override?.notifications || {}),
-    },
-    citizenPortal: {
-      ...base.citizenPortal,
-      ...(override?.citizenPortal || {}),
-    },
-  };
-}
-
 function normalizeMethods(methods = []) {
   const unique = new Set(
-    methods
-      .map((method) => String(method || "").trim())
-      .filter(Boolean),
+    methods.map((method) => String(method || "").trim()).filter(Boolean),
   );
 
   return [...unique];
@@ -66,11 +18,15 @@ function normalizeMethods(methods = []) {
 export async function getConfiguration(_req, res) {
   try {
     const doc = await Configuration.findOne({ key: CONFIG_KEY }).lean();
-    const configuration = mergeConfig(DEFAULT_CONFIGURATION, doc);
+    const configuration = mergeConfiguration(DEFAULT_CONFIGURATION, doc);
 
     return sendOk(res, { configuration });
   } catch (error) {
-    return sendError(res, 500, error?.message || "Failed to load configuration");
+    return sendError(
+      res,
+      500,
+      error?.message || "Failed to load configuration",
+    );
   }
 }
 
@@ -85,8 +41,8 @@ export async function updateConfiguration(req, res) {
     }
 
     const existing = await Configuration.findOne({ key: CONFIG_KEY }).lean();
-    const nextConfiguration = mergeConfig(
-      mergeConfig(DEFAULT_CONFIGURATION, existing),
+    const nextConfiguration = mergeConfiguration(
+      mergeConfiguration(DEFAULT_CONFIGURATION, existing),
       payload,
     );
 
@@ -106,9 +62,13 @@ export async function updateConfiguration(req, res) {
       },
     ).lean();
 
-    const configuration = mergeConfig(DEFAULT_CONFIGURATION, doc);
+    const configuration = mergeConfiguration(DEFAULT_CONFIGURATION, doc);
     return sendOk(res, { configuration });
   } catch (error) {
-    return sendError(res, 500, error?.message || "Failed to update configuration");
+    return sendError(
+      res,
+      500,
+      error?.message || "Failed to update configuration",
+    );
   }
 }

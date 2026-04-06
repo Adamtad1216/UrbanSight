@@ -28,6 +28,21 @@ type AppConfiguration = {
   notifications: {
     notifyCitizenOnStatusChange: boolean;
     notifyAssigneeOnAutoAssignment: boolean;
+    enablePush: boolean;
+    enableEmail: boolean;
+    accountCreationTemplate: {
+      push: string;
+      email: string;
+    };
+    workflowStepTemplates: {
+      new_connection: Record<
+        string,
+        {
+          push?: string;
+          email?: string;
+        }
+      >;
+    };
   };
   citizenPortal: {
     showAssignedMeterReaderInfo: boolean;
@@ -53,11 +68,43 @@ const defaultConfiguration: AppConfiguration = {
   notifications: {
     notifyCitizenOnStatusChange: true,
     notifyAssigneeOnAutoAssignment: true,
+    enablePush: true,
+    enableEmail: true,
+    accountCreationTemplate: {
+      push: "Welcome to UrbanSight, {{name}}. Your {{role}} account has been created successfully.",
+      email:
+        "Hello {{name}},\n\nWelcome to UrbanSight. Your {{role}} account has been created successfully for {{email}}.\n\nRegards,\nUrbanSight Team",
+    },
+    workflowStepTemplates: {
+      new_connection: {},
+    },
   },
   citizenPortal: {
     showAssignedMeterReaderInfo: true,
   },
 };
+
+const requestWorkflowSteps = [
+  "submitted",
+  "adjustment_requested",
+  "under_review",
+  "inspection",
+  "waiting_payment",
+  "payment_submitted",
+  "payment_verified",
+  "payment_rejected",
+  "approved",
+  "completed",
+  "rejected",
+];
+
+function toStepLabel(step: string) {
+  return step
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 function methodsToTextarea(methods: string[]) {
   return methods.join("\n");
@@ -76,6 +123,7 @@ export default function ConfigurationPage() {
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<AppConfiguration>(defaultConfiguration);
   const [paymentMethodsInput, setPaymentMethodsInput] = useState("");
+  const [selectedStep, setSelectedStep] = useState("submitted");
 
   useEffect(() => {
     const load = async () => {
@@ -84,9 +132,32 @@ export default function ConfigurationPage() {
         const response = await apiRequest<{ configuration: AppConfiguration }>(
           "/configuration",
         );
-        setConfig(response.configuration || defaultConfiguration);
+        const nextConfiguration =
+          response.configuration || defaultConfiguration;
+        setConfig({
+          ...nextConfiguration,
+          notifications: {
+            ...defaultConfiguration.notifications,
+            ...(nextConfiguration.notifications || {}),
+            accountCreationTemplate: {
+              ...defaultConfiguration.notifications.accountCreationTemplate,
+              ...(nextConfiguration.notifications?.accountCreationTemplate ||
+                {}),
+            },
+            workflowStepTemplates: {
+              new_connection: {
+                ...(defaultConfiguration.notifications.workflowStepTemplates
+                  .new_connection || {}),
+                ...(nextConfiguration.notifications?.workflowStepTemplates
+                  ?.new_connection || {}),
+              },
+            },
+          },
+        });
         setPaymentMethodsInput(
-          methodsToTextarea(response.configuration?.payments?.supportedMethods || []),
+          methodsToTextarea(
+            response.configuration?.payments?.supportedMethods || [],
+          ),
         );
       } catch (error) {
         toast({
@@ -106,6 +177,11 @@ export default function ConfigurationPage() {
     () => textareaToMethods(paymentMethodsInput).length,
     [paymentMethodsInput],
   );
+
+  const selectedTemplate =
+    config.notifications.workflowStepTemplates?.new_connection?.[
+      selectedStep
+    ] || {};
 
   const saveConfiguration = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -130,7 +206,9 @@ export default function ConfigurationPage() {
 
       setConfig(response.configuration || payload);
       setPaymentMethodsInput(
-        methodsToTextarea(response.configuration?.payments?.supportedMethods || []),
+        methodsToTextarea(
+          response.configuration?.payments?.supportedMethods || [],
+        ),
       );
 
       toast({
@@ -149,16 +227,20 @@ export default function ConfigurationPage() {
   };
 
   if (loading) {
-    return <div className="text-muted-foreground">Loading configuration...</div>;
+    return (
+      <div className="text-muted-foreground">Loading configuration...</div>
+    );
   }
 
   return (
     <form className="space-y-6" onSubmit={saveConfiguration}>
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configuration Center</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Configuration Center
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Configure workflow behavior, payments, imports, notifications, and citizen portal
-          visibility in one place.
+          Configure workflow behavior, payments, imports, notifications, and
+          citizen portal visibility in one place.
         </p>
       </div>
 
@@ -181,7 +263,9 @@ export default function ConfigurationPage() {
                   ...previous,
                   workflow: {
                     ...previous.workflow,
-                    requiredTechniciansForCompletion: Number(event.target.value || 1),
+                    requiredTechniciansForCompletion: Number(
+                      event.target.value || 1,
+                    ),
                   },
                 }))
               }
@@ -195,7 +279,10 @@ export default function ConfigurationPage() {
               onCheckedChange={(checked) =>
                 setConfig((previous) => ({
                   ...previous,
-                  workflow: { ...previous.workflow, autoAssignSurveyor: checked },
+                  workflow: {
+                    ...previous.workflow,
+                    autoAssignSurveyor: checked,
+                  },
                 }))
               }
             />
@@ -208,7 +295,10 @@ export default function ConfigurationPage() {
               onCheckedChange={(checked) =>
                 setConfig((previous) => ({
                   ...previous,
-                  workflow: { ...previous.workflow, autoAssignTechnicians: checked },
+                  workflow: {
+                    ...previous.workflow,
+                    autoAssignTechnicians: checked,
+                  },
                 }))
               }
             />
@@ -221,7 +311,10 @@ export default function ConfigurationPage() {
               onCheckedChange={(checked) =>
                 setConfig((previous) => ({
                   ...previous,
-                  workflow: { ...previous.workflow, autoAssignMeterReader: checked },
+                  workflow: {
+                    ...previous.workflow,
+                    autoAssignMeterReader: checked,
+                  },
                 }))
               }
             />
@@ -241,7 +334,10 @@ export default function ConfigurationPage() {
               onCheckedChange={(checked) =>
                 setConfig((previous) => ({
                   ...previous,
-                  payments: { ...previous.payments, requireReceiptUpload: checked },
+                  payments: {
+                    ...previous.payments,
+                    requireReceiptUpload: checked,
+                  },
                 }))
               }
             />
@@ -300,13 +396,18 @@ export default function ConfigurationPage() {
           </div>
 
           <div className="flex items-center justify-between rounded-xl border p-3">
-            <span className="text-sm">Update Duplicate Tool Codes on Import</span>
+            <span className="text-sm">
+              Update Duplicate Tool Codes on Import
+            </span>
             <Switch
               checked={config.tools.updateDuplicateCodeOnImport}
               onCheckedChange={(checked) =>
                 setConfig((previous) => ({
                   ...previous,
-                  tools: { ...previous.tools, updateDuplicateCodeOnImport: checked },
+                  tools: {
+                    ...previous.tools,
+                    updateDuplicateCodeOnImport: checked,
+                  },
                 }))
               }
             />
@@ -322,6 +423,38 @@ export default function ConfigurationPage() {
                   notifications: {
                     ...previous.notifications,
                     notifyCitizenOnStatusChange: checked,
+                  },
+                }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-xl border p-3">
+            <span className="text-sm">Enable In-App Push Notifications</span>
+            <Switch
+              checked={config.notifications.enablePush}
+              onCheckedChange={(checked) =>
+                setConfig((previous) => ({
+                  ...previous,
+                  notifications: {
+                    ...previous.notifications,
+                    enablePush: checked,
+                  },
+                }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-xl border p-3">
+            <span className="text-sm">Enable Email Notifications</span>
+            <Switch
+              checked={config.notifications.enableEmail}
+              onCheckedChange={(checked) =>
+                setConfig((previous) => ({
+                  ...previous,
+                  notifications: {
+                    ...previous.notifications,
+                    enableEmail: checked,
                   },
                 }))
               }
@@ -345,7 +478,9 @@ export default function ConfigurationPage() {
           </div>
 
           <div className="flex items-center justify-between rounded-xl border p-3 sm:col-span-2">
-            <span className="text-sm">Show Assigned Meter Reader in Citizen Portal</span>
+            <span className="text-sm">
+              Show Assigned Meter Reader in Citizen Portal
+            </span>
             <Switch
               checked={config.citizenPortal.showAssignedMeterReaderInfo}
               onCheckedChange={(checked) =>
@@ -359,12 +494,147 @@ export default function ConfigurationPage() {
               }
             />
           </div>
+
+          <div className="space-y-3 rounded-xl border p-4 sm:col-span-2">
+            <div className="space-y-1">
+              <Label>Account Created Push Template</Label>
+              <Textarea
+                value={config.notifications.accountCreationTemplate.push || ""}
+                onChange={(event) => {
+                  const push = event.target.value;
+                  setConfig((previous) => ({
+                    ...previous,
+                    notifications: {
+                      ...previous.notifications,
+                      accountCreationTemplate: {
+                        ...previous.notifications.accountCreationTemplate,
+                        push,
+                      },
+                    },
+                  }));
+                }}
+                rows={3}
+                placeholder="Push message for successful account creation"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Account Created Email Template</Label>
+              <Textarea
+                value={config.notifications.accountCreationTemplate.email || ""}
+                onChange={(event) => {
+                  const email = event.target.value;
+                  setConfig((previous) => ({
+                    ...previous,
+                    notifications: {
+                      ...previous.notifications,
+                      accountCreationTemplate: {
+                        ...previous.notifications.accountCreationTemplate,
+                        email,
+                      },
+                    },
+                  }));
+                }}
+                rows={5}
+                placeholder="Email body for successful account creation"
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Account placeholders: {"{{name}}"}, {"{{role}}"}, {"{{email}}"}.
+            </p>
+
+            <div className="space-y-1">
+              <Label htmlFor="workflow-step-template">
+                Workflow Step Template
+              </Label>
+              <select
+                id="workflow-step-template"
+                title="Workflow Step Template"
+                aria-label="Workflow Step Template"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={selectedStep}
+                onChange={(event) => setSelectedStep(event.target.value)}
+              >
+                {requestWorkflowSteps.map((step) => (
+                  <option key={step} value={step}>
+                    {toStepLabel(step)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Push Message Template</Label>
+              <Textarea
+                value={selectedTemplate.push || ""}
+                onChange={(event) => {
+                  const push = event.target.value;
+                  setConfig((previous) => ({
+                    ...previous,
+                    notifications: {
+                      ...previous.notifications,
+                      workflowStepTemplates: {
+                        new_connection: {
+                          ...previous.notifications.workflowStepTemplates
+                            .new_connection,
+                          [selectedStep]: {
+                            ...(previous.notifications.workflowStepTemplates
+                              .new_connection?.[selectedStep] || {}),
+                            push,
+                          },
+                        },
+                      },
+                    },
+                  }));
+                }}
+                rows={3}
+                placeholder="Message shown in in-app push notifications"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Email Message Template</Label>
+              <Textarea
+                value={selectedTemplate.email || ""}
+                onChange={(event) => {
+                  const email = event.target.value;
+                  setConfig((previous) => ({
+                    ...previous,
+                    notifications: {
+                      ...previous.notifications,
+                      workflowStepTemplates: {
+                        new_connection: {
+                          ...previous.notifications.workflowStepTemplates
+                            .new_connection,
+                          [selectedStep]: {
+                            ...(previous.notifications.workflowStepTemplates
+                              .new_connection?.[selectedStep] || {}),
+                            email,
+                          },
+                        },
+                      },
+                    },
+                  }));
+                }}
+                rows={5}
+                placeholder="Email body for this workflow step"
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              You can use placeholders: {"{{customerName}}"},{" "}
+              {"{{statusLabel}}"}, {"{{reason}}"}, {"{{waterConnectionCode}}"},{" "}
+              {"{{customerCode}}"}.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
         <Button type="submit" disabled={saving} className="gap-2">
-          <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save Configuration"}
+          <Save className="h-4 w-4" />{" "}
+          {saving ? "Saving..." : "Save Configuration"}
         </Button>
       </div>
     </form>

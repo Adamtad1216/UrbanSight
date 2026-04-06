@@ -11,6 +11,12 @@ function requiresBranch(role) {
   );
 }
 
+function normalizePhone(phone) {
+  return String(phone ?? "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
 export async function listStaffDirectory(_req, res) {
   const users = await User.find({
     role: { $ne: roles.CITIZEN },
@@ -54,8 +60,22 @@ export async function updateUserRole(req, res) {
     user.email = normalizedEmail;
   }
 
+  const normalizedPhone =
+    phone !== undefined ? normalizePhone(phone) : undefined;
+
+  if (normalizedPhone !== undefined && normalizedPhone !== user.phone) {
+    const existingPhoneUser = await User.findOne({
+      phone: normalizedPhone,
+      _id: { $ne: user._id },
+    }).lean();
+
+    if (existingPhoneUser) {
+      return sendError(res, 409, "Phone number already in use");
+    }
+  }
+
   if (name) user.name = name;
-  if (phone !== undefined) user.phone = phone;
+  if (normalizedPhone !== undefined) user.phone = normalizedPhone;
   if (role) user.role = role;
   if (branch !== undefined) user.branch = branch;
 

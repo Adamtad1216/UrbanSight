@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 
 const statusStyles: Record<string, string> = {
   submitted: "bg-warning/10 text-warning border-warning/20",
+  adjustment_requested: "bg-amber-100 text-amber-800 border-amber-300",
   under_review: "bg-info/10 text-info border-info/20",
   pending: "bg-warning/10 text-warning border-warning/20",
   approved: "bg-info/10 text-info border-info/20",

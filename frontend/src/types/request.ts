@@ -6,6 +6,7 @@ type StaffUserRef = Pick<AuthUser, "id" | "name" | "email" | "role"> & {
 
 export type WorkflowStatus =
   | "submitted"
+  | "adjustment_requested"
   | "under_review"
   | "rejected"
   | "inspection"
@@ -75,13 +76,7 @@ export interface NewConnectionRequest {
     | "Public Health Institute"
     | "Regional and Federal Institution"
     | "Local Government";
-  type:
-    | "Private"
-    | "Shared"
-    | "Tap"
-    | "Hydrant"
-    | "Cattle Drink"
-    | "Well";
+  type: "Private" | "Shared" | "Tap" | "Hydrant" | "Cattle Drink" | "Well";
   serviceType: string;
   description: string;
   branch: BranchName;
@@ -152,6 +147,13 @@ export interface NewConnectionRequest {
       technician: string | StaffUserRef;
       completedAt: string;
     }>;
+  };
+  adjustment?: {
+    requested?: boolean;
+    reason?: string;
+    requestedByRole?: string;
+    requestedAt?: string;
+    returnStatus?: WorkflowStatus;
   };
   branchApprovalStage?: number;
   assignedTo?: {

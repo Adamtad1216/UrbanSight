@@ -7,6 +7,8 @@ import {
   assignFinalTeam,
   completeImplementation,
   createNewConnectionRequest,
+  requestApplicationAdjustment,
+  resubmitAdjustedRequest,
   getRequestById,
   listMyRequests,
   listRequests,
@@ -22,6 +24,8 @@ import {
   newConnectionSchema,
   validateBody,
   requestApprovalSchema,
+  adjustmentRequestSchema,
+  adjustmentResubmissionSchema,
   inspectionSchema,
   paymentSubmissionSchema,
   paymentRejectionSchema,
@@ -92,7 +96,7 @@ router.patch(
 router.patch(
   "/request/:id/reject",
   authenticate,
-  authorize(roles.DIRECTOR),
+  authorize(roles.DIRECTOR, roles.ADMIN),
   requestApprovalRules,
   validateRules,
   validateBody(requestApprovalSchema),
@@ -158,6 +162,22 @@ router.patch(
   validateRules,
   validateBody(requestApprovalSchema),
   rejectByBranchOfficer,
+);
+
+router.patch(
+  "/request/:id/adjustment-request",
+  authenticate,
+  authorize(roles.ADMIN, roles.DIRECTOR, roles.COORDINATOR, roles.FINANCE),
+  validateBody(adjustmentRequestSchema),
+  requestApplicationAdjustment,
+);
+
+router.patch(
+  "/request/:id/adjustment-resubmit",
+  authenticate,
+  authorize(roles.CITIZEN),
+  validateBody(adjustmentResubmissionSchema),
+  resubmitAdjustedRequest,
 );
 
 router.patch(

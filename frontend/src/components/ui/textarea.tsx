@@ -2,20 +2,46 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 
-const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => {
-  return (
-    <textarea
-      className={cn(
-        "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-        className,
-      )}
-      ref={ref}
-      {...props}
-    />
-  );
-});
+function hasValue(value: unknown) {
+  if (value == null) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, onChange, ...props }, ref) => {
+    const [isFilled, setIsFilled] = React.useState(() =>
+      hasValue(props.value ?? props.defaultValue),
+    );
+
+    React.useEffect(() => {
+      setIsFilled(hasValue(props.value ?? props.defaultValue));
+    }, [props.value, props.defaultValue]);
+
+    const handleChange: React.ChangeEventHandler<HTMLTextAreaElement> = (
+      event,
+    ) => {
+      setIsFilled(hasValue(event.currentTarget.value));
+      onChange?.(event);
+    };
+
+    return (
+      <textarea
+        data-filled={isFilled ? "true" : "false"}
+        className={cn(
+          "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[filled=true]:border-emerald-400/70 data-[filled=true]:bg-emerald-50/40 dark:data-[filled=true]:bg-emerald-900/20 disabled:cursor-not-allowed disabled:opacity-50",
+          className,
+        )}
+        ref={ref}
+        {...props}
+        onChange={handleChange}
+      />
+    );
+  },
+);
 Textarea.displayName = "Textarea";
 
 export { Textarea };

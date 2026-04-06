@@ -38,7 +38,13 @@ export async function sendStaffCredentialsEmail({ name, email, tempPassword }) {
   });
 }
 
-export async function sendNotificationEmail({ name, email, subject, message }) {
+export async function sendNotificationEmail({
+  name,
+  email,
+  subject,
+  message,
+  wrapMessage = true,
+}) {
   if (!email) {
     return;
   }
@@ -46,10 +52,14 @@ export async function sendNotificationEmail({ name, email, subject, message }) {
   const transporter = getTransport();
   const safeName = String(name || "User").trim() || "User";
 
+  const text = wrapMessage
+    ? `Hello ${safeName},\n\n${message}\n\nRegards,\nUrbanSight Team`
+    : String(message || "").trim();
+
   await transporter.sendMail({
     from: env.emailFrom,
     to: email,
     subject,
-    text: `Hello ${safeName},\n\n${message}\n\nRegards,\nUrbanSight Team`,
+    text,
   });
 }

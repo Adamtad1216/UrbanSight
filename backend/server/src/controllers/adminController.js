@@ -3,6 +3,7 @@ import { roles } from "../utils/constants.js";
 import { sendStaffCredentialsEmail } from "../utils/email.js";
 import { generateTemporaryPassword } from "../utils/password.js";
 import { sendError, sendOk } from "../utils/response.js";
+import { notifyAccountCreated } from "../services/accountNotificationService.js";
 import * as XLSX from "xlsx";
 
 const EXPECTED_STAFF_IMPORT_HEADERS = [
@@ -30,6 +31,12 @@ function toText(value) {
   return String(value ?? "").trim();
 }
 
+function normalizePhone(phone) {
+  return String(phone ?? "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
 function normalizeStatus(value) {
   const normalized = String(value || "")
     .trim()
@@ -51,6 +58,7 @@ async function createStaffAccount({
   phone,
 }) {
   const normalizedEmail = normalizeEmail(email);
+  const normalizedPhone = normalizePhone(phone);
 
   if (!name || name.length < 3) {
     return {
@@ -81,6 +89,15 @@ async function createStaffAccount({
     return { ok: false, code: 409, message: "Email already in use" };
   }
 
+  if (normalizedPhone) {
+    const existingPhoneUser = await User.findOne({
+      phone: normalizedPhone,
+    }).lean();
+    if (existingPhoneUser) {
+      return { ok: false, code: 409, message: "Phone number already in use" };
+    }
+  }
+
   const temporaryPassword = password || generateTemporaryPassword();
 
   const createdUser = await User.create({
@@ -90,7 +107,7 @@ async function createStaffAccount({
     role,
     branch: requiresBranch(role) ? branch : undefined,
     firstLogin: true,
-    phone: phone || "",
+    phone: normalizedPhone,
     status,
     isActive: status === "active",
   });
@@ -104,6 +121,12 @@ async function createStaffAccount({
     });
   } catch (_error) {
     credentialsEmailSent = false;
+  }
+
+  try {
+    await notifyAccountCreated({ user: createdUser });
+  } catch {
+    // Staff account creation should succeed even if notification delivery fails.
   }
 
   return {
