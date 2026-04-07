@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Bell, Sun, Moon, Menu, Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { SystemNotification } from "@/types/notification";
 import { useLanguage } from "@/hooks/use-language";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { getNavItemsForRole } from "@/components/layout/nav-config";
 
 interface TopBarProps {
   onMenuToggle?: () => void;
@@ -24,11 +33,32 @@ interface TopBarProps {
 export function TopBar({ onMenuToggle }: TopBarProps) {
   const navigate = useNavigate();
   const [darkMode, setDarkMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [showDesktopResults, setShowDesktopResults] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<SystemNotification[]>([]);
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const { t, locale, language, setLanguage } = useLanguage();
+  const navItems = useMemo(() => getNavItemsForRole(user?.role), [user?.role]);
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const searchMatches = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return navItems.slice(0, 6);
+    }
+
+    return navItems
+      .filter((item) => {
+        const title = item.title.toLowerCase();
+        const path = item.path.toLowerCase();
+        return (
+          title.includes(normalizedSearchTerm) ||
+          path.includes(normalizedSearchTerm)
+        );
+      })
+      .slice(0, 8);
+  }, [navItems, normalizedSearchTerm]);
 
   const loadNotificationSummary = useCallback(async () => {
     if (!user) return;
@@ -109,6 +139,19 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
     }
   };
 
+  const executeSearchNavigation = (path: string) => {
+    navigate(path);
+    setSearchTerm("");
+    setShowDesktopResults(false);
+    setIsMobileSearchOpen(false);
+  };
+
+  const handleSearchSubmit = () => {
+    if (searchMatches.length > 0) {
+      executeSearchNavigation(searchMatches[0].path);
+    }
+  };
+
   return (
     <header className="h-16 border-b border-border bg-card/80 backdrop-blur-xl flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
       <div className="flex items-center gap-3">
@@ -127,12 +170,68 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
               "common.search.placeholder",
               "Search requests, tasks, users...",
             )}
+            value={searchTerm}
+            onChange={(event) => {
+              setSearchTerm(event.target.value);
+              setShowDesktopResults(true);
+            }}
+            onFocus={() => setShowDesktopResults(true)}
+            onBlur={() => {
+              window.setTimeout(() => setShowDesktopResults(false), 120);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                handleSearchSubmit();
+              }
+            }}
             className="pl-9 w-64 lg:w-80 bg-muted/50 border-border/50 focus:bg-card"
           />
+          {showDesktopResults && (
+            <div className="absolute top-[calc(100%+0.5rem)] z-50 w-full rounded-lg border border-border bg-card shadow-lg">
+              {searchMatches.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  {t("common.search.noResults", "No matching pages")}
+                </div>
+              ) : (
+                <div className="py-1">
+                  {searchMatches.map((item) => (
+                    <button
+                      key={`${item.path}-${item.title}`}
+                      type="button"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        executeSearchNavigation(item.path);
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted/70"
+                    >
+                      <div className="font-medium text-foreground">
+                        {item.title}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {item.path}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="sm:hidden text-muted-foreground hover:text-foreground"
+          onClick={() => setIsMobileSearchOpen(true)}
+          title={t("common.search.placeholder", "Search")}
+          aria-label={t("common.search.placeholder", "Search")}
+        >
+          <Search className="h-5 w-5" />
+        </Button>
+
         <Button
           variant="ghost"
           size="icon"
@@ -224,12 +323,20 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => navigate(user?.role === "citizen" ? "/citizen/profile" : "/settings")}
+              onClick={() =>
+                navigate(
+                  user?.role === "citizen" ? "/citizen/profile" : "/settings",
+                )
+              }
             >
               {t("common.profile", "Profile")}
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => navigate(user?.role === "citizen" ? "/citizen/settings" : "/settings")}
+              onClick={() =>
+                navigate(
+                  user?.role === "citizen" ? "/citizen/settings" : "/settings",
+                )
+              }
             >
               {t("common.settings", "Settings")}
             </DropdownMenuItem>
@@ -240,6 +347,39 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <CommandDialog
+        open={isMobileSearchOpen}
+        onOpenChange={setIsMobileSearchOpen}
+      >
+        <CommandInput
+          value={searchTerm}
+          onValueChange={setSearchTerm}
+          placeholder={t(
+            "common.search.placeholder",
+            "Search requests, tasks, users...",
+          )}
+        />
+        <CommandList>
+          <CommandEmpty>
+            {t("common.search.noResults", "No matching pages")}
+          </CommandEmpty>
+          <CommandGroup heading={t("common.search.results", "Pages")}>
+            {searchMatches.map((item) => (
+              <CommandItem
+                key={`${item.path}-${item.title}`}
+                value={`${item.title} ${item.path}`}
+                onSelect={() => executeSearchNavigation(item.path)}
+              >
+                <span>{item.title}</span>
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {item.path}
+                </span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
     </header>
   );
 }

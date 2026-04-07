@@ -63,7 +63,7 @@ export async function apiRequest<T>(
   const {
     body,
     timeoutMs = 15000,
-    retries = 1,
+    retries,
     retryDelayMs = 800,
     cacheKey,
     queueWhenOffline = false,
@@ -72,6 +72,8 @@ export async function apiRequest<T>(
   const headers = new Headers(options.headers || {});
   const authToken = getStoredAuthToken();
   const method = String(requestOptions.method || "GET").toUpperCase();
+  const maxRetries =
+    typeof retries === "number" ? retries : method === "GET" ? 1 : 0;
 
   if (authToken && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${authToken}`);
@@ -86,7 +88,7 @@ export async function apiRequest<T>(
   let response: Response | null = null;
   let lastError: unknown = null;
 
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
 
@@ -104,7 +106,7 @@ export async function apiRequest<T>(
       window.clearTimeout(timer);
       lastError = error;
 
-      if (attempt < retries) {
+      if (attempt < maxRetries) {
         await new Promise((resolve) =>
           window.setTimeout(resolve, retryDelayMs),
         );

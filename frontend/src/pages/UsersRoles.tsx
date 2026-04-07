@@ -245,6 +245,8 @@ export default function UsersPage() {
       await apiRequest("/admin/create-staff", {
         method: "POST",
         body: createPayload,
+        timeoutMs: 60000,
+        retries: 0,
       });
 
       toast({
@@ -343,6 +345,8 @@ export default function UsersPage() {
       setIsResettingPassword(user.id);
       await apiRequest(`/users/${user.id}/reset-password`, {
         method: "POST",
+        timeoutMs: 60000,
+        retries: 0,
       });
       toast({
         title: "Password reset",
@@ -383,6 +387,8 @@ export default function UsersPage() {
       }>("/admin/import-staff", {
         method: "POST",
         body: formData,
+        timeoutMs: 180000,
+        retries: 0,
       });
 
       setImportSummary(response);
