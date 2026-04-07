@@ -66,6 +66,14 @@ JWT_SECRET=change-this-secret
 CLIENT_ORIGIN=http://localhost:5173
 ```
 
+For production on Render, set:
+
+```env
+NODE_ENV=production
+DB_MODE=atlas
+MONGO_ATLAS_URI=mongodb+srv://username:password@cluster.mongodb.net/urbansight
+```
+
 Recommended local production-safe DB settings:
 
 ```env

@@ -31,10 +31,21 @@ function buildLocalMongoUri() {
 
 export function resolveMongoUri() {
   const localUri = env.localMongoUri || buildLocalMongoUri();
+  const atlasUri = env.mongoAtlasUri || env.mongoUri;
+
+  if (env.nodeEnv === "production") {
+    if (atlasUri) {
+      return atlasUri;
+    }
+
+    throw new Error(
+      "Production MongoDB requires MONGO_ATLAS_URI (or MONGO_URI pointing to Atlas)",
+    );
+  }
 
   if (env.dbMode === "atlas") {
-    if (env.mongoAtlasUri) {
-      return env.mongoAtlasUri;
+    if (atlasUri) {
+      return atlasUri;
     }
 
     return env.mongoUri || localUri;
@@ -44,8 +55,8 @@ export function resolveMongoUri() {
     return localUri;
   }
 
-  if (env.dbMode === "auto" && env.mongoAtlasUri) {
-    return env.mongoAtlasUri;
+  if (env.dbMode === "auto" && atlasUri) {
+    return atlasUri;
   }
 
   if (env.mongoUri) {
@@ -95,7 +106,8 @@ export async function connectDB() {
       const canTryFallback =
         Boolean(fallbackUri) &&
         fallbackUri !== primaryUri &&
-        env.dbMode !== "atlas";
+        env.dbMode !== "atlas" &&
+        env.nodeEnv !== "production";
 
       if (canTryFallback) {
         try {

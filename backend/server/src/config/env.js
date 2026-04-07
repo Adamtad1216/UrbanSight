@@ -51,8 +51,8 @@ function parseBoolean(value, fallback) {
   return fallback;
 }
 
-function normalizeDbMode(value) {
-  const mode = String(value || "local")
+function normalizeDbMode(value, fallbackMode) {
+  const mode = String(value || fallbackMode || "local")
     .trim()
     .toLowerCase();
   if (["local", "atlas", "auto"].includes(mode)) {
@@ -67,7 +67,12 @@ export const env = {
   port: process.env.PORT || 5000,
   mongoUri: process.env.MONGO_URI || "",
   mongoAtlasUri: process.env.MONGO_ATLAS_URI || "",
-  dbMode: normalizeDbMode(process.env.DB_MODE),
+  dbMode: normalizeDbMode(
+    process.env.DB_MODE,
+    (process.env.NODE_ENV || "development") === "production"
+      ? "atlas"
+      : "local",
+  ),
   dbName: process.env.DB_NAME || "urbansight",
   mongoHost: process.env.MONGO_HOST || "127.0.0.1",
   mongoPort: parseInteger(process.env.MONGO_PORT, 27017),
