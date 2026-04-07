@@ -76,6 +76,20 @@ function isAllowedLocalDevOrigin(origin) {
   );
 }
 
+function isAllowedNativeAppOrigin(origin) {
+  if (typeof origin !== "string") {
+    return false;
+  }
+
+  const normalizedOrigin = origin.trim().toLowerCase();
+  return (
+    normalizedOrigin === "http://localhost" ||
+    normalizedOrigin === "https://localhost" ||
+    normalizedOrigin === "capacitor://localhost" ||
+    normalizedOrigin === "ionic://localhost"
+  );
+}
+
 app.use(
   cors({
     origin(origin, callback) {
@@ -86,6 +100,12 @@ app.use(
       }
 
       if (env.clientOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      // Allow trusted Capacitor/Ionic WebView origins used by mobile apps.
+      if (isAllowedNativeAppOrigin(origin)) {
         callback(null, true);
         return;
       }
