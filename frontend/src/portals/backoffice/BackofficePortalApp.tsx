@@ -1,11 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  BrowserRouter,
-  Navigate,
-  Outlet,
-  Route,
-  Routes,
-} from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +10,8 @@ import { RoleHome } from "@/components/auth/RoleHome";
 import { SuccessModalProvider } from "@/context/success-modal-context";
 import { GlobalSuccessModal } from "@/components/feedback/GlobalSuccessModal";
 import { LanguageProvider } from "@/context/language-context";
+import { AppRouter } from "@/components/app/AppRouter";
+import { NativeAppBridge } from "@/components/app/NativeAppBridge";
 import StaffLoginPage from "@/pages/auth/StaffLogin";
 import UnauthorizedPage from "@/pages/auth/Unauthorized";
 import NotFound from "@/pages/NotFound";
@@ -72,7 +68,8 @@ export default function BackofficePortalApp() {
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
+            <AppRouter>
+              <NativeAppBridge />
               <SuccessModalProvider>
                 <Routes>
                   <Route
@@ -206,7 +203,7 @@ export default function BackofficePortalApp() {
                 </Routes>
                 <GlobalSuccessModal />
               </SuccessModalProvider>
-            </BrowserRouter>
+            </AppRouter>
           </TooltipProvider>
         </AuthProvider>
       </LanguageProvider>

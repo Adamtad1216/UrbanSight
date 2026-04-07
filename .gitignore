@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Local toolchains and mobile build artifacts
+.tools/
+apk-output/
+frontend/dist-mobile/
+
 # Environment files (keep templates only)
 .env
 .env.*
@@ -33,3 +38,5 @@ frontend/.env
 # Generated analytics backtest outputs
 backend/server/reports/analytics-v2-backtest-*.json
 backend/server/reports/analytics-v2-backtest-latest.json
+
+.fake

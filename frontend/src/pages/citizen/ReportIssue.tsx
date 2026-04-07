@@ -8,6 +8,12 @@ import { Label } from "@/components/ui/label";
 import { RequestLocationMap } from "@/components/request/RequestLocationMap";
 import { NewConnectionRequest } from "@/types/request";
 import { useLanguage } from "@/hooks/use-language";
+import {
+  capturePhotoFile,
+  getCurrentCoordinates,
+  hapticMedium,
+  isNativeApp,
+} from "@/lib/native";
 
 interface FormState {
   requestId: string;
@@ -30,6 +36,10 @@ export default function CitizenReportIssuePage() {
   const [issueAttachmentUrl, setIssueAttachmentUrl] = useState("");
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [capturedLocation, setCapturedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const { toast } = useToast();
   const { openModal } = useSuccessModal();
   const { t } = useLanguage();
@@ -39,6 +49,9 @@ export default function CitizenReportIssuePage() {
       try {
         const response = await apiRequest<{ requests: NewConnectionRequest[] }>(
           "/requests/my",
+          {
+            cacheKey: "requests.my",
+          },
         );
 
         setRequests(response.requests || []);
@@ -79,6 +92,65 @@ export default function CitizenReportIssuePage() {
       waterConnectionCode: selected?.waterConnectionCode || "",
       customerCode: selected?.customerCode || "",
     }));
+  };
+
+  const captureIssuePhoto = async () => {
+    try {
+      const file = await capturePhotoFile();
+      if (!file) {
+        toast({
+          title: "Camera unavailable",
+          description: "Use file upload to attach an issue image.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setUploadingAttachment(true);
+      const uploadedUrl = await uploadFile(file);
+      setIssueAttachmentUrl(uploadedUrl);
+      toast({
+        title: "Photo attached",
+        description: "Captured image uploaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Camera upload failed",
+        description:
+          error instanceof Error ? error.message : "Unable to capture image",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const captureCurrentLocation = async () => {
+    try {
+      const coords = await getCurrentCoordinates();
+      if (!coords) {
+        toast({
+          title: "Location unavailable",
+          description: "Using previously submitted connection location.",
+        });
+        return;
+      }
+
+      setCapturedLocation(coords);
+      toast({
+        title: "Location captured",
+        description: "Current GPS coordinates will be attached to this report.",
+      });
+    } catch (error) {
+      toast({
+        title: "Location access failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Unable to access your location.",
+        variant: "destructive",
+      });
+    }
   };
 
   const selectedConnection = useMemo(
@@ -154,6 +226,7 @@ export default function CitizenReportIssuePage() {
 
       await apiRequest("/issues", {
         method: "POST",
+        queueWhenOffline: true,
         body: {
           title: generatedTitle,
           description: generatedDescription,
@@ -161,16 +234,25 @@ export default function CitizenReportIssuePage() {
           customerCode: form.customerCode,
           category: form.issueType,
           location: {
-            latitude: selectedConnection.location.latitude,
-            longitude: selectedConnection.location.longitude,
+            latitude:
+              capturedLocation?.latitude ??
+              selectedConnection.location.latitude,
+            longitude:
+              capturedLocation?.longitude ??
+              selectedConnection.location.longitude,
             address: selectedConnection?.address || "",
           },
           attachments: [issueAttachmentUrl],
         },
       });
 
+      if (isNativeApp()) {
+        await hapticMedium();
+      }
+
       setForm(initialState);
       setIssueAttachmentUrl("");
+      setCapturedLocation(null);
       openModal(
         "Issue submitted successfully. You will be redirected to your dashboard.",
         "/citizen/dashboard",
@@ -477,6 +559,39 @@ export default function CitizenReportIssuePage() {
                 )}
               </p>
             )}
+            {isNativeApp() ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={captureIssuePhoto}
+                disabled={uploadingAttachment}
+              >
+                Capture Photo
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Live Location (Optional)</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={captureCurrentLocation}
+              >
+                Use Current Location
+              </Button>
+              {capturedLocation ? (
+                <span className="text-xs text-muted-foreground">
+                  {capturedLocation.latitude.toFixed(5)},{" "}
+                  {capturedLocation.longitude.toFixed(5)}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Defaulting to the saved connection coordinates.
+                </span>
+              )}
+            </div>
           </div>
 
           <Button

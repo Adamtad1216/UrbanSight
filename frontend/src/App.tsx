@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +10,8 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { RoleHome } from "@/components/auth/RoleHome";
 import { GlobalSuccessModal } from "@/components/feedback/GlobalSuccessModal";
 import { LanguageProvider } from "@/context/language-context";
+import { AppRouter } from "@/components/app/AppRouter";
+import { NativeAppBridge } from "@/components/app/NativeAppBridge";
 import Index from "./pages/Index";
 import ServiceRequests from "./pages/ServiceRequests";
 import Workflow from "./pages/Workflow";
@@ -38,7 +40,8 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <AppRouter>
+            <NativeAppBridge />
             <SuccessModalProvider>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
@@ -298,7 +301,7 @@ const App = () => (
               </Routes>
               <GlobalSuccessModal />
             </SuccessModalProvider>
-          </BrowserRouter>
+          </AppRouter>
         </TooltipProvider>
       </AuthProvider>
     </LanguageProvider>

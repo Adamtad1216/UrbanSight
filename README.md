@@ -197,6 +197,52 @@ npm run build:citizen
 npm run build:backoffice
 ```
 
+## Mobile Sync And Release
+
+Set a shared backend URL for both web and mobile so citizen submissions appear in backoffice:
+
+```env
+VITE_API_BASE_URL=https://your-domain.com/api
+```
+
+If `VITE_API_BASE_URL` is not set, mobile scripts fallback to `http://<your-lan-ip>:5000/api` for local backend testing.
+
+Sync Android assets from each portal build:
+
+```bash
+npm run mobile:sync:citizen
+npm run mobile:sync:backoffice
+```
+
+Watch source changes and keep syncing mobile assets:
+
+```bash
+npm run mobile:watch:citizen
+npm run mobile:watch:backoffice
+```
+
+Generate release APK and AAB for each portal:
+
+```bash
+npm run mobile:release:citizen
+npm run mobile:release:backoffice
+```
+
+Generate both portal releases in one go:
+
+```bash
+npm run mobile:release:all
+```
+
+Artifacts are written to:
+
+```text
+apk-output/urbansight-citizen-release.apk
+apk-output/urbansight-citizen-release.aab
+apk-output/urbansight-backoffice-release.apk
+apk-output/urbansight-backoffice-release.aab
+```
+
 ## Testing and Quality
 
 ```bash

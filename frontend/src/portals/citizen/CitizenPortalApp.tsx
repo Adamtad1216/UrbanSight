@@ -1,11 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  BrowserRouter,
-  Navigate,
-  Outlet,
-  Route,
-  Routes,
-} from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +9,8 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { SuccessModalProvider } from "@/context/success-modal-context";
 import { GlobalSuccessModal } from "@/components/feedback/GlobalSuccessModal";
 import { LanguageProvider } from "@/context/language-context";
+import { AppRouter } from "@/components/app/AppRouter";
+import { NativeAppBridge } from "@/components/app/NativeAppBridge";
 import LoginPage from "@/pages/auth/Login";
 import RegisterPage from "@/pages/auth/Register";
 import UnauthorizedPage from "@/pages/auth/Unauthorized";
@@ -51,7 +47,8 @@ export default function CitizenPortalApp() {
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
+            <AppRouter>
+              <NativeAppBridge />
               <SuccessModalProvider>
                 <Routes>
                   <Route path="/" element={<CitizenLandingPage />} />
@@ -131,7 +128,7 @@ export default function CitizenPortalApp() {
                 </Routes>
                 <GlobalSuccessModal />
               </SuccessModalProvider>
-            </BrowserRouter>
+            </AppRouter>
           </TooltipProvider>
         </AuthProvider>
       </LanguageProvider>
