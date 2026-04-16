@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,6 +38,14 @@ import { BranchName } from "@/types/auth";
 import { NewConnectionRequest } from "@/types/request";
 import { useSuccessModal } from "@/hooks/use-success-modal";
 import { useLanguage } from "@/hooks/use-language";
+import {
+  deleteNewConnectionDraft,
+  readNewConnectionDraft,
+  writeNewConnectionDraft,
+  type DraftAttachmentMeta,
+  type NewConnectionDraftPreview,
+  type NewConnectionDraftRecord,
+} from "@/lib/citizen-draft";
 
 const readingZoneOptions = [
   {
@@ -226,32 +234,31 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-type AttachmentMeta = {
-  fileName: string;
-  size: number;
-};
-
 export default function CitizenNewConnectionPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const adjustmentRequestId = searchParams.get("adjustmentRequestId");
+  const shouldContinueDraft = searchParams.get("draft") === "continue";
   const isAdjustmentMode = Boolean(adjustmentRequestId);
   const { toast } = useToast();
   const { openModal } = useSuccessModal();
   const { t, language } = useLanguage();
   const [submitting, setSubmitting] = useState(false);
-  const [loadingExistingRequest, setLoadingExistingRequest] = useState(
-    isAdjustmentMode,
-  );
+  const [loadingExistingRequest, setLoadingExistingRequest] =
+    useState(isAdjustmentMode);
   const [attachmentsUploading, setAttachmentsUploading] = useState(false);
   const [attachmentPreview, setAttachmentPreview] = useState<{
     title: string;
     url: string;
   } | null>(null);
-  const [attachmentMeta, setAttachmentMeta] = useState<AttachmentMeta[]>([]);
+  const [attachmentMeta, setAttachmentMeta] = useState<DraftAttachmentMeta[]>(
+    [],
+  );
   const [replaceAttachmentIndex, setReplaceAttachmentIndex] = useState<
     number | null
   >(null);
+  const [savedDraft, setSavedDraft] =
+    useState<NewConnectionDraftRecord<NewConnectionDraftPreview> | null>(null);
   const [requiredDocUploading, setRequiredDocUploading] = useState({
     housePlan: false,
     idCard: false,
@@ -266,6 +273,8 @@ export default function CitizenNewConnectionPage() {
     reset,
     setValue,
     watch,
+    getValues,
+    formState,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -290,6 +299,97 @@ export default function CitizenNewConnectionPage() {
 
   const location = watch("location");
   const attachments = watch("attachments") || [];
+  const watchedValues = watch();
+
+  const canUseDrafts = !isAdjustmentMode;
+
+  const refreshDraftState = useCallback(() => {
+    if (!canUseDrafts) {
+      setSavedDraft(null);
+      return;
+    }
+
+    setSavedDraft(readNewConnectionDraft<NewConnectionDraftPreview>());
+  }, [canUseDrafts]);
+
+  const clearDraft = useCallback(() => {
+    deleteNewConnectionDraft();
+    setSavedDraft(null);
+  }, []);
+
+  const saveDraft = useCallback(
+    (showToast = true) => {
+      if (!canUseDrafts) {
+        toast({
+          title: "Draft not available",
+          description: "Drafts are only available for new applications.",
+        });
+        return;
+      }
+
+      try {
+        const payload: NewConnectionDraftRecord<FormValues> = {
+          values: getValues(),
+          attachmentMeta,
+          savedAt: Date.now(),
+        };
+        writeNewConnectionDraft(payload);
+        setSavedDraft(payload);
+        if (showToast) {
+          toast({
+            title: "Draft saved",
+            description: "You can continue this application later.",
+          });
+        }
+      } catch {
+        toast({
+          title: "Unable to save draft",
+          description: "Try again",
+          variant: "destructive",
+        });
+      }
+    },
+    [attachmentMeta, canUseDrafts, getValues, toast],
+  );
+
+  useEffect(() => {
+    refreshDraftState();
+  }, [refreshDraftState]);
+
+  useEffect(() => {
+    if (!canUseDrafts || !shouldContinueDraft) return;
+
+    const draft = readNewConnectionDraft<NewConnectionDraftPreview>();
+    if (!draft?.values) return;
+
+    reset(draft.values as FormValues);
+    setAttachmentMeta(
+      Array.isArray(draft.attachmentMeta) ? draft.attachmentMeta : [],
+    );
+    setSavedDraft(draft);
+    toast({
+      title: "Draft restored",
+      description: "Your saved application has been loaded.",
+    });
+  }, [canUseDrafts, reset, shouldContinueDraft, toast]);
+
+  useEffect(() => {
+    if (!canUseDrafts) return;
+
+    if (!formState.isDirty) return;
+
+    const timeoutId = window.setTimeout(() => {
+      saveDraft(false);
+    }, 700);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    attachmentMeta,
+    canUseDrafts,
+    formState.isDirty,
+    saveDraft,
+    watchedValues,
+  ]);
 
   useEffect(() => {
     if (!isAdjustmentMode || !adjustmentRequestId) {
@@ -306,7 +406,8 @@ export default function CitizenNewConnectionPage() {
         if (response.request.status !== "adjustment_requested") {
           toast({
             title: "Cannot edit this request",
-            description: "Only adjustment-requested applications can be edited.",
+            description:
+              "Only adjustment-requested applications can be edited.",
             variant: "destructive",
           });
           navigate(`/citizen/requests/${adjustmentRequestId}`);
@@ -322,10 +423,11 @@ export default function CitizenNewConnectionPage() {
           numberOfFamily: response.request.numberOfFamily,
           address: response.request.address,
           houseNumberZone: response.request.houseNumberZone,
-          readingZone: response.request.readingZone as FormValues["readingZone"],
+          readingZone: response.request
+            .readingZone as FormValues["readingZone"],
           meterSize: response.request.meterSize as FormValues["meterSize"],
-          customerGroup:
-            response.request.customerGroup as FormValues["customerGroup"],
+          customerGroup: response.request
+            .customerGroup as FormValues["customerGroup"],
           type: response.request.type as FormValues["type"],
           serviceType: "New Water Connection",
           description: response.request.description || "",
@@ -548,6 +650,7 @@ export default function CitizenNewConnectionPage() {
           "Your application has been submitted successfully.",
           "/citizen/dashboard",
         );
+        clearDraft();
       }
     } catch (error) {
       toast({
@@ -597,504 +700,555 @@ export default function CitizenNewConnectionPage() {
               onSubmit={handleSubmit(onSubmit)}
               noValidate
             >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t("form.customerName", "Customer Name")}</Label>
+                  <Input {...register("customerName")} />
+                  {errors.customerName && (
+                    <p className="text-xs text-destructive">
+                      {errors.customerName.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    {t("form.customerNameAmharic", "Customer Name (Amharic)")}
+                  </Label>
+                  <Controller
+                    control={control}
+                    name="customerNameAmharic"
+                    render={({ field }) => (
+                      <Input
+                        value={field.value}
+                        onChange={(event) => {
+                          // Keep only Amharic letters and spaces during typing.
+                          const sanitized = event.target.value.replace(
+                            /[^\u1200-\u137F\s]/g,
+                            "",
+                          );
+                          field.onChange(sanitized);
+                        }}
+                        inputMode="text"
+                        maxLength={80}
+                        placeholder={language === "am" ? "ሙሉ ስም" : "ሙሉ ስም"}
+                      />
+                    )}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    {language === "am"
+                      ? "በአማርኛ ፊደላት ብቻ ያስገቡ"
+                      : "Use Amharic letters only"}
+                  </p>
+                  {errors.customerNameAmharic && (
+                    <p className="text-xs text-destructive">
+                      {errors.customerNameAmharic.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("common.email", "Email")}</Label>
+                  <Input type="email" {...register("email")} />
+                  {errors.email && (
+                    <p className="text-xs text-destructive">
+                      {errors.email.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("form.tinNumber", "TIN Number")}</Label>
+                  <Input
+                    {...register("tinNumber")}
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="1234567890"
+                  />
+                  {errors.tinNumber && (
+                    <p className="text-xs text-destructive">
+                      {errors.tinNumber.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("form.phoneNumber", "Phone Number")}</Label>
+                  <Input
+                    type="tel"
+                    placeholder="+251 94 741 4313"
+                    inputMode="tel"
+                    maxLength={16}
+                    {...register("phoneNumber", {
+                      setValueAs: (value) =>
+                        normalizePhoneNumber(String(value ?? "")),
+                    })}
+                  />
+                  {errors.phoneNumber && (
+                    <p className="text-xs text-destructive">
+                      {errors.phoneNumber.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    {t("form.familyMembers", "Number of Family Members")}
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={30}
+                    {...register("numberOfFamily", { valueAsNumber: true })}
+                  />
+                  {errors.numberOfFamily && (
+                    <p className="text-xs text-destructive">
+                      {errors.numberOfFamily.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("form.address", "Address")}</Label>
+                  <Input {...register("address")} />
+                  {errors.address && (
+                    <p className="text-xs text-destructive">
+                      {errors.address.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("form.houseZone", "House Number / Zone")}</Label>
+                  <Input {...register("houseNumberZone")} />
+                  {errors.houseNumberZone && (
+                    <p className="text-xs text-destructive">
+                      {errors.houseNumberZone.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("form.readingZone", "Reading Zone")}</Label>
+                  <Controller
+                    control={control}
+                    name="readingZone"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {readingZoneOptions.map((zone) => (
+                            <SelectItem key={zone.value} value={zone.value}>
+                              {language === "am"
+                                ? `${zone.am} (${zone.en})`
+                                : `${zone.en} (${zone.am})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.readingZone && (
+                    <p className="text-xs text-destructive">
+                      {errors.readingZone.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("form.meterSize", "Meter Size")}</Label>
+                  <Controller
+                    control={control}
+                    name="meterSize"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {renderSelectItems(meterSizeOptions)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.meterSize && (
+                    <p className="text-xs text-destructive">
+                      {errors.meterSize.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("form.customerGroup", "Customer Group")}</Label>
+                  <Controller
+                    control={control}
+                    name="customerGroup"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customerGroupOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {language === "am"
+                                ? `${option.am} (${option.en})`
+                                : `${option.en} (${option.am})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.customerGroup && (
+                    <p className="text-xs text-destructive">
+                      {errors.customerGroup.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("form.connectionType", "Connection Type")}</Label>
+                  <Controller
+                    control={control}
+                    name="type"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {connectionTypeOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {language === "am"
+                                ? `${option.am} (${option.en})`
+                                : `${option.en} (${option.am})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.type && (
+                    <p className="text-xs text-destructive">
+                      {errors.type.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("form.serviceType", "Service Type")}</Label>
+                  <Input {...register("serviceType")} disabled />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("form.selectBranch", "Select Branch")}</Label>
+                  <Controller
+                    control={control}
+                    name="branch"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {branchOptions.map((branch) => (
+                            <SelectItem key={branch} value={branch}>
+                              {branch}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.branch && (
+                    <p className="text-xs text-destructive">
+                      {errors.branch.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label>{t("form.customerName", "Customer Name")}</Label>
-                <Input {...register("customerName")} />
-                {errors.customerName && (
+                <Label>
+                  {t("form.descriptionOptional", "Description (optional)")}
+                </Label>
+                <Textarea rows={4} {...register("description")} />
+                {errors.description && (
                   <p className="text-xs text-destructive">
-                    {errors.customerName.message}
+                    {errors.description.message}
                   </p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>
-                  {t("form.customerNameAmharic", "Customer Name (Amharic)")}
-                </Label>
-                <Controller
-                  control={control}
-                  name="customerNameAmharic"
-                  render={({ field }) => (
-                    <Input
-                      value={field.value}
-                      onChange={(event) => {
-                        // Keep only Amharic letters and spaces during typing.
-                        const sanitized = event.target.value.replace(
-                          /[^\u1200-\u137F\s]/g,
-                          "",
+
+              <MapPicker
+                latitude={location.latitude}
+                longitude={location.longitude}
+                onChange={(latitude, longitude) =>
+                  setValue(
+                    "location",
+                    { latitude, longitude },
+                    { shouldValidate: true },
+                  )
+                }
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <DocumentUploadField
+                    label={t("form.housePlan", "House Plan")}
+                    required
+                    uploadFn={uploadFile}
+                    valueUrl={watch("housePlan")}
+                    onValueChange={(url) =>
+                      setValue("housePlan", url, { shouldValidate: true })
+                    }
+                    onUploadingChange={(uploading) =>
+                      setRequiredDocUploading((previous) => ({
+                        ...previous,
+                        housePlan: uploading,
+                      }))
+                    }
+                  />
+                  {errors.housePlan && (
+                    <p className="text-xs text-destructive">
+                      {errors.housePlan.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <DocumentUploadField
+                    label={t("form.idCard", "ID Card")}
+                    required
+                    uploadFn={uploadFile}
+                    valueUrl={watch("idCard")}
+                    onValueChange={(url) =>
+                      setValue("idCard", url, { shouldValidate: true })
+                    }
+                    onUploadingChange={(uploading) =>
+                      setRequiredDocUploading((previous) => ({
+                        ...previous,
+                        idCard: uploading,
+                      }))
+                    }
+                  />
+                  {errors.idCard && (
+                    <p className="text-xs text-destructive">
+                      {errors.idCard.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    {t(
+                      "form.additionalAttachments",
+                      "Additional Attachments (optional)",
+                    )}
+                  </Label>
+                  <input
+                    ref={attachmentsInputRef}
+                    multiple
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
+                    aria-label={t(
+                      "form.additionalAttachmentsInput",
+                      "Additional attachments file input",
+                    )}
+                    title={t(
+                      "form.additionalAttachmentsInput",
+                      "Additional attachments file input",
+                    )}
+                    onChange={uploadAttachments}
+                    className="hidden"
+                  />
+                  <input
+                    ref={replaceAttachmentInputRef}
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
+                    aria-label={t(
+                      "form.changeAttachmentInput",
+                      "Change attachment file input",
+                    )}
+                    title={t(
+                      "form.changeAttachmentInput",
+                      "Change attachment file input",
+                    )}
+                    onChange={replaceAttachment}
+                    className="hidden"
+                  />
+                  {attachments.length === 0 && (
+                    <div className="rounded-2xl border border-dashed p-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={openAdditionalAttachmentPicker}
+                        disabled={attachmentsUploading}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        {attachmentsUploading
+                          ? t(
+                              "form.uploadingAttachments",
+                              "Uploading attachments...",
+                            )
+                          : t("form.uploadDocument", "Upload document")}
+                      </Button>
+                    </div>
+                  )}
+                  {attachments.length > 0 && (
+                    <div className="space-y-3">
+                      {attachments.map((url, index) => {
+                        const kind = getDocumentKind(url);
+                        const fileLabel = getAttachmentLabel(url, index);
+                        const meta = attachmentMeta[index];
+
+                        return (
+                          <div
+                            key={`${url}-${index}`}
+                            className="rounded-2xl border p-3"
+                          >
+                            <div className="mb-3 flex items-center gap-2">
+                              {kind === "image" ? (
+                                <ImageIcon className="h-4 w-4 text-primary" />
+                              ) : (
+                                <FileText className="h-4 w-4 text-primary" />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">
+                                  {fileLabel}
+                                </p>
+                                {meta?.size ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatFileSize(meta.size)}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            {kind === "image" ? (
+                              <img
+                                src={url}
+                                alt={fileLabel}
+                                className="mb-3 h-24 w-full rounded-xl object-cover"
+                              />
+                            ) : (
+                              <div className="mb-3 flex h-24 items-center justify-center rounded-xl bg-muted/40">
+                                <FileText className="h-7 w-7 text-muted-foreground" />
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setAttachmentPreview({
+                                    title: fileLabel,
+                                    url,
+                                  })
+                                }
+                              >
+                                <Eye className="mr-1 h-4 w-4" /> View
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  openReplaceAttachmentPicker(index)
+                                }
+                                disabled={attachmentsUploading}
+                              >
+                                <RefreshCcw className="mr-1 h-4 w-4" /> Change
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => removeAttachment(index)}
+                              >
+                                <Trash2 className="mr-1 h-4 w-4" /> Remove
+                              </Button>
+                            </div>
+                          </div>
                         );
-                        field.onChange(sanitized);
-                      }}
-                      inputMode="text"
-                      maxLength={80}
-                      placeholder={language === "am" ? "ሙሉ ስም" : "ሙሉ ስም"}
-                    />
+                      })}
+                    </div>
                   )}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  {language === "am"
-                    ? "በአማርኛ ፊደላት ብቻ ያስገቡ"
-                    : "Use Amharic letters only"}
-                </p>
-                {errors.customerNameAmharic && (
-                  <p className="text-xs text-destructive">
-                    {errors.customerNameAmharic.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>{t("common.email", "Email")}</Label>
-                <Input type="email" {...register("email")} />
-                {errors.email && (
-                  <p className="text-xs text-destructive">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>{t("form.tinNumber", "TIN Number")}</Label>
-                <Input
-                  {...register("tinNumber")}
-                  inputMode="numeric"
-                  maxLength={10}
-                  placeholder="1234567890"
-                />
-                {errors.tinNumber && (
-                  <p className="text-xs text-destructive">
-                    {errors.tinNumber.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>{t("form.phoneNumber", "Phone Number")}</Label>
-                <Input
-                  type="tel"
-                  placeholder="+251 94 741 4313"
-                  inputMode="tel"
-                  maxLength={16}
-                  {...register("phoneNumber", {
-                    setValueAs: (value) =>
-                      normalizePhoneNumber(String(value ?? "")),
-                  })}
-                />
-                {errors.phoneNumber && (
-                  <p className="text-xs text-destructive">
-                    {errors.phoneNumber.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>
-                  {t("form.familyMembers", "Number of Family Members")}
-                </Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={30}
-                  {...register("numberOfFamily", { valueAsNumber: true })}
-                />
-                {errors.numberOfFamily && (
-                  <p className="text-xs text-destructive">
-                    {errors.numberOfFamily.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>{t("form.address", "Address")}</Label>
-                <Input {...register("address")} />
-                {errors.address && (
-                  <p className="text-xs text-destructive">
-                    {errors.address.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>{t("form.houseZone", "House Number / Zone")}</Label>
-                <Input {...register("houseNumberZone")} />
-                {errors.houseNumberZone && (
-                  <p className="text-xs text-destructive">
-                    {errors.houseNumberZone.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>{t("form.readingZone", "Reading Zone")}</Label>
-                <Controller
-                  control={control}
-                  name="readingZone"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {readingZoneOptions.map((zone) => (
-                          <SelectItem key={zone.value} value={zone.value}>
-                            {language === "am"
-                              ? `${zone.am} (${zone.en})`
-                              : `${zone.en} (${zone.am})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.readingZone && (
-                  <p className="text-xs text-destructive">
-                    {errors.readingZone.message}
-                  </p>
-                )}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>{t("form.meterSize", "Meter Size")}</Label>
-                <Controller
-                  control={control}
-                  name="meterSize"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {renderSelectItems(meterSizeOptions)}
-                      </SelectContent>
-                    </Select>
-                  )}
+              {attachmentPreview && (
+                <DocumentPreviewModal
+                  open={Boolean(attachmentPreview)}
+                  title={attachmentPreview.title}
+                  url={attachmentPreview.url}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setAttachmentPreview(null);
+                    }
+                  }}
                 />
-                {errors.meterSize && (
-                  <p className="text-xs text-destructive">
-                    {errors.meterSize.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t("form.customerGroup", "Customer Group")}</Label>
-                <Controller
-                  control={control}
-                  name="customerGroup"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {customerGroupOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {language === "am"
-                              ? `${option.am} (${option.en})`
-                              : `${option.en} (${option.am})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.customerGroup && (
-                  <p className="text-xs text-destructive">
-                    {errors.customerGroup.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t("form.connectionType", "Connection Type")}</Label>
-                <Controller
-                  control={control}
-                  name="type"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {connectionTypeOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {language === "am"
-                              ? `${option.am} (${option.en})`
-                              : `${option.en} (${option.am})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.type && (
-                  <p className="text-xs text-destructive">
-                    {errors.type.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t("form.serviceType", "Service Type")}</Label>
-                <Input {...register("serviceType")} disabled />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t("form.selectBranch", "Select Branch")}</Label>
-                <Controller
-                  control={control}
-                  name="branch"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {branchOptions.map((branch) => (
-                          <SelectItem key={branch} value={branch}>
-                            {branch}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.branch && (
-                  <p className="text-xs text-destructive">
-                    {errors.branch.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>
-                {t("form.descriptionOptional", "Description (optional)")}
-              </Label>
-              <Textarea rows={4} {...register("description")} />
-              {errors.description && (
-                <p className="text-xs text-destructive">
-                  {errors.description.message}
-                </p>
               )}
-            </div>
 
-            <MapPicker
-              latitude={location.latitude}
-              longitude={location.longitude}
-              onChange={(latitude, longitude) =>
-                setValue(
-                  "location",
-                  { latitude, longitude },
-                  { shouldValidate: true },
-                )
-              }
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <DocumentUploadField
-                  label={t("form.housePlan", "House Plan")}
-                  required
-                  uploadFn={uploadFile}
-                  valueUrl={watch("housePlan")}
-                  onValueChange={(url) =>
-                    setValue("housePlan", url, { shouldValidate: true })
-                  }
-                  onUploadingChange={(uploading) =>
-                    setRequiredDocUploading((previous) => ({
-                      ...previous,
-                      housePlan: uploading,
-                    }))
-                  }
-                />
-                {errors.housePlan && (
-                  <p className="text-xs text-destructive">
-                    {errors.housePlan.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <DocumentUploadField
-                  label={t("form.idCard", "ID Card")}
-                  required
-                  uploadFn={uploadFile}
-                  valueUrl={watch("idCard")}
-                  onValueChange={(url) =>
-                    setValue("idCard", url, { shouldValidate: true })
-                  }
-                  onUploadingChange={(uploading) =>
-                    setRequiredDocUploading((previous) => ({
-                      ...previous,
-                      idCard: uploading,
-                    }))
-                  }
-                />
-                {errors.idCard && (
-                  <p className="text-xs text-destructive">
-                    {errors.idCard.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>
-                  {t(
-                    "form.additionalAttachments",
-                    "Additional Attachments (optional)",
-                  )}
-                </Label>
-                <input
-                  ref={attachmentsInputRef}
-                  multiple
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
-                  aria-label={t(
-                    "form.additionalAttachmentsInput",
-                    "Additional attachments file input",
-                  )}
-                  title={t(
-                    "form.additionalAttachmentsInput",
-                    "Additional attachments file input",
-                  )}
-                  onChange={uploadAttachments}
-                  className="hidden"
-                />
-                <input
-                  ref={replaceAttachmentInputRef}
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp,.gif"
-                  aria-label={t(
-                    "form.changeAttachmentInput",
-                    "Change attachment file input",
-                  )}
-                  title={t(
-                    "form.changeAttachmentInput",
-                    "Change attachment file input",
-                  )}
-                  onChange={replaceAttachment}
-                  className="hidden"
-                />
-                {attachments.length === 0 && (
-                  <div className="rounded-2xl border border-dashed p-4">
+              <div className="flex flex-wrap gap-2">
+                {!isAdjustmentMode && (
+                  <>
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full"
-                      onClick={openAdditionalAttachmentPicker}
-                      disabled={attachmentsUploading}
+                      onClick={saveDraft}
+                      disabled={!formState.isDirty}
                     >
-                      <Upload className="mr-2 h-4 w-4" />
-                      {attachmentsUploading
-                        ? t(
-                            "form.uploadingAttachments",
-                            "Uploading attachments...",
-                          )
-                        : t("form.uploadDocument", "Upload document")}
+                      Save as Draft
                     </Button>
-                  </div>
+                    {savedDraft && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={clearDraft}
+                      >
+                        Discard Draft
+                      </Button>
+                    )}
+                  </>
                 )}
-                {attachments.length > 0 && (
-                  <div className="space-y-3">
-                    {attachments.map((url, index) => {
-                      const kind = getDocumentKind(url);
-                      const fileLabel = getAttachmentLabel(url, index);
-                      const meta = attachmentMeta[index];
 
-                      return (
-                        <div
-                          key={`${url}-${index}`}
-                          className="rounded-2xl border p-3"
-                        >
-                          <div className="mb-3 flex items-center gap-2">
-                            {kind === "image" ? (
-                              <ImageIcon className="h-4 w-4 text-primary" />
-                            ) : (
-                              <FileText className="h-4 w-4 text-primary" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium">
-                                {fileLabel}
-                              </p>
-                              {meta?.size ? (
-                                <p className="text-xs text-muted-foreground">
-                                  {formatFileSize(meta.size)}
-                                </p>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          {kind === "image" ? (
-                            <img
-                              src={url}
-                              alt={fileLabel}
-                              className="mb-3 h-24 w-full rounded-xl object-cover"
-                            />
-                          ) : (
-                            <div className="mb-3 flex h-24 items-center justify-center rounded-xl bg-muted/40">
-                              <FileText className="h-7 w-7 text-muted-foreground" />
-                            </div>
-                          )}
-
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                setAttachmentPreview({ title: fileLabel, url })
-                              }
-                            >
-                              <Eye className="mr-1 h-4 w-4" /> View
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openReplaceAttachmentPicker(index)}
-                              disabled={attachmentsUploading}
-                            >
-                              <RefreshCcw className="mr-1 h-4 w-4" /> Change
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => removeAttachment(index)}
-                            >
-                              <Trash2 className="mr-1 h-4 w-4" /> Remove
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {attachmentPreview && (
-              <DocumentPreviewModal
-                open={Boolean(attachmentPreview)}
-                title={attachmentPreview.title}
-                url={attachmentPreview.url}
-                onOpenChange={(open) => {
-                  if (!open) {
-                    setAttachmentPreview(null);
+                <Button
+                  type="submit"
+                  disabled={
+                    submitting ||
+                    attachmentsUploading ||
+                    requiredDocUploading.housePlan ||
+                    requiredDocUploading.idCard
                   }
-                }}
-              />
-            )}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  {submitting
+                    ? t("form.submitting", "Submitting...")
+                    : isAdjustmentMode
+                      ? "Update and Resubmit"
+                      : t("form.submitRequest", "Submit Request")}
+                </Button>
+              </div>
 
-              <Button
-                type="submit"
-                disabled={
-                  submitting ||
-                  attachmentsUploading ||
-                  requiredDocUploading.housePlan ||
-                  requiredDocUploading.idCard
-                }
-                className="gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                {submitting
-                  ? t("form.submitting", "Submitting...")
-                  : isAdjustmentMode
-                    ? "Update and Resubmit"
-                    : t("form.submitRequest", "Submit Request")}
-              </Button>
+              {savedDraft && !isAdjustmentMode ? (
+                <p className="text-xs text-muted-foreground">
+                  Draft last saved:{" "}
+                  {new Date(savedDraft.savedAt).toLocaleString()}
+                </p>
+              ) : null}
             </form>
           </CardContent>
         </Card>

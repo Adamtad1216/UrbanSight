@@ -53,7 +53,23 @@ export default function CitizenPortalApp() {
                 <Routes>
                   <Route path="/" element={<CitizenLandingPage />} />
                   <Route path="/login" element={<LoginPage />} />
+                  <Route
+                    path="/auth/login-citizen"
+                    element={<Navigate to="/login" replace />}
+                  />
+                  <Route
+                    path="/auth/login"
+                    element={<Navigate to="/login" replace />}
+                  />
                   <Route path="/register" element={<RegisterPage />} />
+                  <Route
+                    path="/auth/register-citizen"
+                    element={<Navigate to="/register" replace />}
+                  />
+                  <Route
+                    path="/auth/register"
+                    element={<Navigate to="/register" replace />}
+                  />
                   <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
                   <Route path="/citizen" element={<CitizenLayoutRoute />}>

@@ -1,0 +1,39 @@
+
+> vite_react_shadcn_ts@0.0.0 mobile:release:citizen
+> node scripts/mobile-release.mjs citizen
+
+[mobile-release] Using API base URL: https://urbansight-backend.onrender.com/api 
+[patch-capacitor] node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/plugin/SystemBars.java: already-patched
+[patch-capacitor] node_modules/@capacitor/status-bar/android/src/main/java/com/capacitorjs/plugins/statusbar/StatusBar.java: already-patched
+
+> vite_react_shadcn_ts@0.0.0 build:citizen
+> vite build --config frontend/vite.citizen.config.ts
+
+[36mvite v5.4.19 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 16 modules transformed.
+[31mx[39m Build failed in 1.52s
+[31merror during build:
+[31m[vite:esbuild] Transform failed with 1 error:
+C:/Users/A/OneDrive/Documents/Projects/urbanflow-connect-main/urbanflow-connect-main/frontend/src/pages/citizen/NewConnection.tsx:342:6: ERROR: Unexpected "catch"[31m
+file: [36mC:/Users/A/OneDrive/Documents/Projects/urbanflow-connect-main/urbanflow-connect-main/frontend/src/pages/citizen/NewConnection.tsx:342:6[31m
+[33m
+[33mUnexpected "catch"[33m
+340|          });
+341|        }
+342|      } catch {
+   |        ^
+343|        toast({
+344|          title: "Unable to save draft",
+[31m
+    at failureErrorWithLog (C:\Users\A\OneDrive\Documents\Projects\urbanflow-connect-main\urbanflow-connect-main\node_modules\esbuild\lib\main.js:1472:15)
+    at C:\Users\A\OneDrive\Documents\Projects\urbanflow-connect-main\urbanflow-connect-main\node_modules\esbuild\lib\main.js:755:50
+    at responseCallbacks.<computed> (C:\Users\A\OneDrive\Documents\Projects\urbanflow-connect-main\urbanflow-connect-main\node_modules\esbuild\lib\main.js:622:9)
+    at handleIncomingPacket (C:\Users\A\OneDrive\Documents\Projects\urbanflow-connect-main\urbanflow-connect-main\node_modules\esbuild\lib\main.js:677:12)
+    at Socket.readFromStdout (C:\Users\A\OneDrive\Documents\Projects\urbanflow-connect-main\urbanflow-connect-main\node_modules\esbuild\lib\main.js:600:7)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)[39m
+npm run build:citizen failed with code 1

@@ -147,7 +147,10 @@ export function AuthExperience({
         password: values.password,
       });
       triggerSuccessFeedback("Welcome back", "You are now signed in.");
-      const redirectTo = getDashboardPathByRole(authenticatedUser.role);
+      const redirectTo =
+        portal === "citizen"
+          ? "/dashboard"
+          : getDashboardPathByRole(authenticatedUser.role);
       navigate(redirectTo, { replace: true });
     } catch (error) {
       triggerErrorFeedback(
@@ -172,7 +175,10 @@ export function AuthExperience({
         "Your citizen account has been created.",
       );
       navigate(
-        registerSuccessPath ?? getDashboardPathByRole(registeredUser.role),
+        registerSuccessPath ??
+          (portal === "citizen"
+            ? "/dashboard"
+            : getDashboardPathByRole(registeredUser.role)),
         { replace: true },
       );
     } catch (error) {

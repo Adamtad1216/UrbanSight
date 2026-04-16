@@ -7,6 +7,13 @@ import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { RequestTimeline } from "@/components/request/RequestTimeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CitizenDraftCard } from "@/components/citizen/CitizenDraftCard";
+import {
+  deleteNewConnectionDraft,
+  readNewConnectionDraft,
+  type NewConnectionDraftPreview,
+  type NewConnectionDraftRecord,
+} from "@/lib/citizen-draft";
 
 interface CitizenIssue {
   _id: string;
@@ -21,8 +28,12 @@ export default function CitizenMyRequestsPage() {
   const [requests, setRequests] = useState<NewConnectionRequest[]>([]);
   const [issues, setIssues] = useState<CitizenIssue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savedDraft, setSavedDraft] =
+    useState<NewConnectionDraftRecord<NewConnectionDraftPreview> | null>(null);
 
   useEffect(() => {
+    setSavedDraft(readNewConnectionDraft<NewConnectionDraftPreview>());
+
     const load = async () => {
       try {
         const response = await apiRequest<{ requests: NewConnectionRequest[] }>(
@@ -42,6 +53,11 @@ export default function CitizenMyRequestsPage() {
     load();
   }, []);
 
+  const handleDeleteDraft = () => {
+    deleteNewConnectionDraft();
+    setSavedDraft(null);
+  };
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -59,6 +75,10 @@ export default function CitizenMyRequestsPage() {
           <Link to="/citizen/new-connection">New Connection Request</Link>
         </Button>
       </motion.div>
+
+      {savedDraft && (
+        <CitizenDraftCard draft={savedDraft} onDelete={handleDeleteDraft} />
+      )}
 
       <div className="space-y-3">
         <div>

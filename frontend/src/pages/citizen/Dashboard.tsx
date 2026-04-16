@@ -39,6 +39,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { RequestStatusTracker } from "@/components/citizen/RequestStatusTracker";
+import { CitizenDraftCard } from "@/components/citizen/CitizenDraftCard";
+import {
+  deleteNewConnectionDraft,
+  readNewConnectionDraft,
+  type NewConnectionDraftPreview,
+  type NewConnectionDraftRecord,
+} from "@/lib/citizen-draft";
 import { NewConnectionRequest } from "@/types/request";
 import { SystemNotification } from "@/types/notification";
 
@@ -121,6 +128,8 @@ export default function CitizenDashboardPage() {
   const [requests, setRequests] = useState<NewConnectionRequest[]>([]);
   const [issues, setIssues] = useState<CitizenIssue[]>([]);
   const [notifications, setNotifications] = useState<SystemNotification[]>([]);
+  const [savedDraft, setSavedDraft] =
+    useState<NewConnectionDraftRecord<NewConnectionDraftPreview> | null>(null);
   const [apiSummary, setApiSummary] = useState<{
     totalRequests?: number;
     activeRequests?: number;
@@ -183,6 +192,8 @@ export default function CitizenDashboardPage() {
   }, []);
 
   useEffect(() => {
+    setSavedDraft(readNewConnectionDraft<NewConnectionDraftPreview>());
+
     const load = async () => {
       setLoading(true);
 
@@ -215,6 +226,15 @@ export default function CitizenDashboardPage() {
 
     load();
   }, [loadCitizenRequests, loadNotifications, loadSummary, toast]);
+
+  const handleDeleteDraft = () => {
+    deleteNewConnectionDraft();
+    setSavedDraft(null);
+    toast({
+      title: "Draft deleted",
+      description: "Your saved connection draft was removed.",
+    });
+  };
 
   const allItems = useMemo<DashboardItem[]>(() => {
     const requestItems = requests.map((request) => ({
@@ -396,6 +416,10 @@ export default function CitizenDashboardPage() {
           </div>
         </div>
       </motion.section>
+
+      {savedDraft && (
+        <CitizenDraftCard draft={savedDraft} onDelete={handleDeleteDraft} />
+      )}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {loading ? (
