@@ -57,6 +57,21 @@ function detectLanApiBaseUrl() {
   return null;
 }
 
+function readProductionApiBaseUrl() {
+  const productionEnvPath = path.join(root, ".env.production");
+  if (!fs.existsSync(productionEnvPath)) {
+    return null;
+  }
+
+  const content = fs.readFileSync(productionEnvPath, "utf8");
+  const match = content.match(/^VITE_API_BASE_URL=(.+)$/m);
+  if (!match) {
+    return null;
+  }
+
+  return match[1].trim();
+}
+
 function ensureLocalProperties() {
   const sdkDir = path.join(process.env.LOCALAPPDATA || "", "Android", "Sdk");
   if (!sdkDir || !fs.existsSync(sdkDir)) {
@@ -91,7 +106,9 @@ async function main() {
   }
 
   const mobileApiBaseUrl =
-    process.env.VITE_API_BASE_URL || detectLanApiBaseUrl();
+    process.env.VITE_API_BASE_URL ||
+    readProductionApiBaseUrl() ||
+    detectLanApiBaseUrl();
 
   if (!mobileApiBaseUrl) {
     throw new Error(

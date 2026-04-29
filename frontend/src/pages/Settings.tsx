@@ -17,6 +17,22 @@ const phoneErrorMessage =
   "Phone number must be +2519XXXXXXXX, 09XXXXXXXX, or 07XXXXXXXX";
 const normalizePhoneNumber = (value: string) =>
   value.replace(/\s+/g, "").trim();
+const notificationStorageKey = "urbansight_notification_preferences";
+
+function coerceNotificationPrefs(input: unknown) {
+  const fallback = { email: true, push: true, dailyDigest: true };
+  if (!input || typeof input !== "object") {
+    return fallback;
+  }
+
+  const candidate = input as Partial<typeof fallback>;
+  return {
+    email: typeof candidate.email === "boolean" ? candidate.email : true,
+    push: typeof candidate.push === "boolean" ? candidate.push : true,
+    dailyDigest:
+      typeof candidate.dailyDigest === "boolean" ? candidate.dailyDigest : true,
+  };
+}
 
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth();
@@ -40,6 +56,7 @@ export default function SettingsPage() {
     push: true,
     dailyDigest: true,
   });
+  const [savingNotifications, setSavingNotifications] = useState(false);
   const [systemPrefs, setSystemPrefs] = useState({
     maintenanceMode: false,
     autoAssignTasks: true,
@@ -62,10 +79,12 @@ export default function SettingsPage() {
 
     try {
       const storedNotifications = window.localStorage.getItem(
-        "urbansight_notification_preferences",
+        notificationStorageKey,
       );
       if (storedNotifications) {
-        setNotificationPrefs(JSON.parse(storedNotifications));
+        setNotificationPrefs(
+          coerceNotificationPrefs(JSON.parse(storedNotifications)),
+        );
       }
     } catch {
       // Ignore malformed local preferences and fallback to defaults.
@@ -200,17 +219,58 @@ export default function SettingsPage() {
     }
   };
 
-  const updateNotificationPref = (
+  const updateNotificationPref = async (
     key: keyof typeof notificationPrefs,
     value: boolean,
   ) => {
-    const next = { ...notificationPrefs, [key]: value };
-    setNotificationPrefs(next);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        "urbansight_notification_preferences",
-        JSON.stringify(next),
-      );
+    try {
+      setSavingNotifications(true);
+
+      if (
+        key === "push" &&
+        value &&
+        typeof window !== "undefined" &&
+        "Notification" in window
+      ) {
+        if (window.Notification.permission === "denied") {
+          toast({
+            title: "Push notifications blocked",
+            description:
+              "Allow browser notification permission, then enable this toggle.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (window.Notification.permission === "default") {
+          const permission = await window.Notification.requestPermission();
+          if (permission !== "granted") {
+            toast({
+              title: "Push notifications not enabled",
+              description: "Permission was not granted by the browser.",
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+
+      const next = { ...notificationPrefs, [key]: value };
+      setNotificationPrefs(next);
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          notificationStorageKey,
+          JSON.stringify(next),
+        );
+      }
+
+      toast({
+        title: "Notification preference updated",
+        description: "Your setting was saved successfully.",
+      });
+    } finally {
+      setSavingNotifications(false);
     }
   };
 
@@ -469,8 +529,9 @@ export default function SettingsPage() {
               <Switch
                 checked={notificationPrefs.email}
                 onCheckedChange={(value) =>
-                  updateNotificationPref("email", value)
+                  void updateNotificationPref("email", value)
                 }
+                disabled={savingNotifications}
               />
             </div>
 
@@ -484,8 +545,9 @@ export default function SettingsPage() {
               <Switch
                 checked={notificationPrefs.push}
                 onCheckedChange={(value) =>
-                  updateNotificationPref("push", value)
+                  void updateNotificationPref("push", value)
                 }
+                disabled={savingNotifications}
               />
             </div>
 
@@ -499,8 +561,9 @@ export default function SettingsPage() {
               <Switch
                 checked={notificationPrefs.dailyDigest}
                 onCheckedChange={(value) =>
-                  updateNotificationPref("dailyDigest", value)
+                  void updateNotificationPref("dailyDigest", value)
                 }
+                disabled={savingNotifications}
               />
             </div>
           </motion.div>

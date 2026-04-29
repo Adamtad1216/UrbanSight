@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap");
 
 :root {
   --us-bg-0: #03045e;
@@ -36,7 +36,7 @@
     );
   color: var(--us-text);
   font-family:
-    "Inter",
+    "Source Sans 3",
     system-ui,
     -apple-system,
     "Segoe UI",
@@ -174,6 +174,7 @@
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
 }
 
 .us-brand-bottom {
@@ -214,6 +215,7 @@
   padding: 0.62rem 1rem;
   font-size: 0.86rem;
   font-weight: 600;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
   text-decoration: none;
   transition:
     transform 180ms ease,
@@ -262,17 +264,19 @@
 .us-hero-copy h1 {
   margin-top: 1rem;
   font-size: clamp(2.2rem, 5vw, 4.5rem);
-  line-height: 1.03;
+  line-height: 1.08;
   letter-spacing: -0.03em;
   font-weight: 800;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
 }
 
 .us-hero-copy p {
   margin-top: 1.05rem;
   max-width: 58ch;
-  color: var(--us-muted);
-  font-size: 1.04rem;
-  line-height: 1.75;
+  color: #e6f7fb;
+  font-size: 1.08rem;
+  line-height: 1.82;
+  font-weight: 500;
 }
 
 .us-pill {
@@ -286,40 +290,6 @@
   color: #caf0f8;
   border: 1px solid rgba(202, 240, 248, 0.34);
   background: rgba(3, 4, 94, 0.42);
-}
-
-.us-live-note {
-  margin-top: 0.9rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #90e0ef;
-  font-size: 0.82rem;
-}
-
-.us-live-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  background: #90e0ef;
-}
-
-.us-live-dot-on {
-  background: #caf0f8;
-  box-shadow: 0 0 0 0 rgba(202, 240, 248, 0.55);
-  animation: usPulse 1.8s ease-out infinite;
-}
-
-@keyframes usPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(202, 240, 248, 0.55);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(202, 240, 248, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(51, 242, 190, 0);
-  }
 }
 
 .us-hero-cta {
@@ -361,6 +331,7 @@
 .us-kpi-card p {
   font-size: 1.3rem;
   font-weight: 700;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
 }
 
 .us-kpi-card span {
@@ -383,21 +354,62 @@
 }
 
 .us-mini-card p {
-  font-size: 0.78rem;
-  color: #90e0ef;
+  font-size: 0.84rem;
+  color: #bcebf4;
 }
 
 .us-mini-card strong {
   display: block;
   margin-top: 0.26rem;
-  font-size: 1.08rem;
+  font-size: 1.02rem;
+  line-height: 1.45;
+  color: #f4fdff;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
 }
 
 .us-mini-card small {
   display: block;
   margin-top: 0.4rem;
-  color: #90e0ef;
-  font-size: 0.74rem;
+  color: #d2f1f8;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.us-readability-card {
+  border-radius: 1rem;
+  border: 1px solid rgba(202, 240, 248, 0.28);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.92rem;
+}
+
+.us-readability-kicker {
+  color: #bcebf4;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.us-readability-card h3 {
+  margin-top: 0.35rem;
+  font-size: 1.16rem;
+  line-height: 1.4;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
+}
+
+.us-readability-card ul {
+  margin-top: 0.65rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.us-readability-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.38rem;
+  color: #d9f6fb;
+  font-size: 0.92rem;
+  line-height: 1.58;
 }
 
 .us-mini-card-wide {
@@ -450,9 +462,10 @@
 .us-showcase-head h2 {
   margin-top: 0.82rem;
   font-size: clamp(1.6rem, 3.3vw, 2.35rem);
-  line-height: 1.18;
+  line-height: 1.28;
   letter-spacing: -0.02em;
   max-width: 21ch;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
 }
 
 .us-feature-grid {
@@ -501,13 +514,14 @@
 .us-feature-card h3 {
   margin-top: 0.7rem;
   font-size: 1.02rem;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
 }
 
 .us-feature-card p {
   margin-top: 0.42rem;
-  color: #90e0ef;
-  font-size: 0.92rem;
-  line-height: 1.6;
+  color: #d4f3f9;
+  font-size: 0.96rem;
+  line-height: 1.66;
 }
 
 .us-showcase {
@@ -538,7 +552,8 @@
 }
 
 .us-show-card p {
-  font-size: 0.88rem;
+  font-size: 0.95rem;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
   color: #caf0f8;
   margin-bottom: 0.72rem;
 }
@@ -622,8 +637,9 @@
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  color: #90e0ef;
-  font-size: 0.88rem;
+  color: #d8f6fb;
+  font-size: 0.94rem;
+  line-height: 1.58;
 }
 
 .us-show-card-wide {
@@ -640,7 +656,8 @@
   align-items: center;
   gap: 0.4rem;
   color: #caf0f8;
-  font-size: 0.88rem;
+  font-size: 0.94rem;
+  line-height: 1.56;
   border: 1px solid rgba(202, 240, 248, 0.2);
   border-radius: 0.75rem;
   padding: 0.55rem 0.65rem;
@@ -684,13 +701,14 @@
 .us-capability-card h3 {
   margin-top: 0.68rem;
   font-size: 1rem;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
 }
 
 .us-capability-card p {
   margin-top: 0.45rem;
-  color: #90e0ef;
-  font-size: 0.9rem;
-  line-height: 1.58;
+  color: #d4f3f9;
+  font-size: 0.95rem;
+  line-height: 1.66;
 }
 
 .us-test-card {
@@ -711,14 +729,9 @@
 }
 
 .us-insight-label {
-  color: #90e0ef;
-  font-size: 0.84rem;
-}
-
-.us-insight-value {
-  margin-top: 0.4rem;
-  font-size: 2rem;
-  line-height: 1;
+  color: #bcebf4;
+  font-size: 0.9rem;
+  font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
 }
 
 .us-test-card div {
@@ -731,8 +744,9 @@
 }
 
 .us-test-card span {
-  font-size: 0.78rem;
-  color: #90e0ef;
+  font-size: 0.92rem;
+  line-height: 1.62;
+  color: #d4f3f9;
 }
 
 .us-footer {
@@ -756,8 +770,9 @@
   display: block;
   margin-top: 0.32rem;
   max-width: 46ch;
-  color: #90e0ef;
-  font-size: 0.86rem;
+  color: #d4f3f9;
+  font-size: 0.94rem;
+  line-height: 1.62;
 }
 
 .us-footer > div:last-child {

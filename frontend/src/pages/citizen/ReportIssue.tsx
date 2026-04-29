@@ -5,15 +5,14 @@ import { useSuccessModal } from "@/hooks/use-success-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DocumentUploadField } from "@/components/request/DocumentUploadField";
+import { DocumentPreviewModal } from "@/components/request/DocumentPreviewModal";
+import { getDocumentKind } from "@/components/request/document-utils";
 import { RequestLocationMap } from "@/components/request/RequestLocationMap";
 import { NewConnectionRequest } from "@/types/request";
 import { useLanguage } from "@/hooks/use-language";
-import {
-  capturePhotoFile,
-  getCurrentCoordinates,
-  hapticMedium,
-  isNativeApp,
-} from "@/lib/native";
+import { ExternalLink, Eye, FileText, Image as ImageIcon } from "lucide-react";
+import { capturePhotoFile, hapticMedium, isNativeApp } from "@/lib/native";
 
 interface FormState {
   requestId: string;
@@ -36,9 +35,9 @@ export default function CitizenReportIssuePage() {
   const [issueAttachmentUrl, setIssueAttachmentUrl] = useState("");
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [capturedLocation, setCapturedLocation] = useState<{
-    latitude: number;
-    longitude: number;
+  const [submittedPreview, setSubmittedPreview] = useState<{
+    title: string;
+    url: string;
   } | null>(null);
   const { toast } = useToast();
   const { openModal } = useSuccessModal();
@@ -125,34 +124,6 @@ export default function CitizenReportIssuePage() {
     }
   };
 
-  const captureCurrentLocation = async () => {
-    try {
-      const coords = await getCurrentCoordinates();
-      if (!coords) {
-        toast({
-          title: "Location unavailable",
-          description: "Using previously submitted connection location.",
-        });
-        return;
-      }
-
-      setCapturedLocation(coords);
-      toast({
-        title: "Location captured",
-        description: "Current GPS coordinates will be attached to this report.",
-      });
-    } catch (error) {
-      toast({
-        title: "Location access failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Unable to access your location.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const selectedConnection = useMemo(
     () =>
       completedConnections.find((request) => request._id === form.requestId) ||
@@ -160,31 +131,52 @@ export default function CitizenReportIssuePage() {
     [completedConnections, form.requestId],
   );
 
-  const uploadIssueAttachment = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setUploadingAttachment(true);
-      const uploadedUrl = await uploadFile(file);
-      setIssueAttachmentUrl(uploadedUrl);
-      toast({
-        title: "Attachment uploaded",
-        description: "Issue document uploaded successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Attachment upload failed",
-        description:
-          error instanceof Error ? error.message : "Unable to upload file",
-        variant: "destructive",
-      });
-    } finally {
-      setUploadingAttachment(false);
+  const submittedDocuments = useMemo(() => {
+    if (!selectedConnection) {
+      return [] as Array<{
+        key: string;
+        label: string;
+        url: string;
+        kind: "image" | "pdf" | "file";
+      }>;
     }
-  };
+
+    const docs: Array<{
+      key: string;
+      label: string;
+      url: string;
+      kind: "image" | "pdf" | "file";
+    }> = [];
+
+    if (selectedConnection.housePlan) {
+      docs.push({
+        key: "house-plan",
+        label: "House Plan",
+        url: selectedConnection.housePlan,
+        kind: getDocumentKind(selectedConnection.housePlan),
+      });
+    }
+
+    if (selectedConnection.idCard) {
+      docs.push({
+        key: "id-card",
+        label: "ID Card",
+        url: selectedConnection.idCard,
+        kind: getDocumentKind(selectedConnection.idCard),
+      });
+    }
+
+    (selectedConnection.attachments || []).forEach((url, index) => {
+      docs.push({
+        key: `attachment-${index + 1}`,
+        label: `Attachment ${index + 1}`,
+        url,
+        kind: getDocumentKind(url),
+      });
+    });
+
+    return docs;
+  }, [selectedConnection]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -234,12 +226,8 @@ export default function CitizenReportIssuePage() {
           customerCode: form.customerCode,
           category: form.issueType,
           location: {
-            latitude:
-              capturedLocation?.latitude ??
-              selectedConnection.location.latitude,
-            longitude:
-              capturedLocation?.longitude ??
-              selectedConnection.location.longitude,
+            latitude: selectedConnection.location.latitude,
+            longitude: selectedConnection.location.longitude,
             address: selectedConnection?.address || "",
           },
           attachments: [issueAttachmentUrl],
@@ -252,7 +240,6 @@ export default function CitizenReportIssuePage() {
 
       setForm(initialState);
       setIssueAttachmentUrl("");
-      setCapturedLocation(null);
       openModal(
         "Issue submitted successfully. You will be redirected to your dashboard.",
         "/citizen/dashboard",
@@ -439,35 +426,71 @@ export default function CitizenReportIssuePage() {
                     "Submitted Documents (Read Only)",
                   )}
                 </Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                  <a
-                    href={selectedConnection.housePlan}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-md border border-border px-3 py-2 hover:bg-muted"
-                  >
-                    House Plan
-                  </a>
-                  <a
-                    href={selectedConnection.idCard}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-md border border-border px-3 py-2 hover:bg-muted"
-                  >
-                    ID Card
-                  </a>
-                  {(selectedConnection.attachments || []).map((url, index) => (
-                    <a
-                      key={`${url}-${index}`}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-md border border-border px-3 py-2 hover:bg-muted"
-                    >
-                      Attachment {index + 1}
-                    </a>
-                  ))}
-                </div>
+                {submittedDocuments.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {submittedDocuments.map((document) => (
+                      <div
+                        key={document.key}
+                        className="rounded-xl border border-border/70 bg-muted/20 p-3"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
+                            {document.kind === "image" ? (
+                              <ImageIcon className="h-4 w-4" />
+                            ) : (
+                              <FileText className="h-4 w-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                              {document.label}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {document.kind === "image"
+                                ? "Image document"
+                                : document.kind === "pdf"
+                                  ? "PDF document"
+                                  : "Supporting file"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setSubmittedPreview({
+                                title: document.label,
+                                url: document.url,
+                              })
+                            }
+                          >
+                            <Eye className="mr-1 h-4 w-4" /> View
+                          </Button>
+                          <Button
+                            asChild
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                          >
+                            <a
+                              href={document.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <ExternalLink className="mr-1 h-4 w-4" /> Open
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No submitted documents found for this connection.
+                  </p>
+                )}
               </div>
             </>
           ) : (
@@ -521,44 +544,17 @@ export default function CitizenReportIssuePage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="issue-attachment">
-              {t("citizen.reportIssue.attachment", "Issue Attachment Document")}
-            </Label>
-            <Input
-              id="issue-attachment"
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={uploadIssueAttachment}
-              disabled={uploadingAttachment}
+            <DocumentUploadField
+              label={t(
+                "citizen.reportIssue.attachment",
+                "Issue Attachment Document",
+              )}
+              required
+              valueUrl={issueAttachmentUrl}
+              onValueChange={setIssueAttachmentUrl}
+              onUploadingChange={setUploadingAttachment}
+              uploadFn={uploadFile}
             />
-            {uploadingAttachment ? (
-              <p className="text-xs text-muted-foreground">
-                {t(
-                  "citizen.reportIssue.uploadingAttachment",
-                  "Uploading attachment...",
-                )}
-              </p>
-            ) : null}
-            {issueAttachmentUrl ? (
-              <a
-                href={issueAttachmentUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-primary underline"
-              >
-                {t(
-                  "citizen.reportIssue.viewAttachment",
-                  "View uploaded issue attachment",
-                )}
-              </a>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {t(
-                  "citizen.reportIssue.uploadOne",
-                  "Upload one supporting document before submit.",
-                )}
-              </p>
-            )}
             {isNativeApp() ? (
               <Button
                 type="button"
@@ -571,29 +567,6 @@ export default function CitizenReportIssuePage() {
             ) : null}
           </div>
 
-          <div className="space-y-2">
-            <Label>Live Location (Optional)</Label>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={captureCurrentLocation}
-              >
-                Use Current Location
-              </Button>
-              {capturedLocation ? (
-                <span className="text-xs text-muted-foreground">
-                  {capturedLocation.latitude.toFixed(5)},{" "}
-                  {capturedLocation.longitude.toFixed(5)}
-                </span>
-              ) : (
-                <span className="text-xs text-muted-foreground">
-                  Defaulting to the saved connection coordinates.
-                </span>
-              )}
-            </div>
-          </div>
-
           <Button
             disabled={submitting || uploadingAttachment || !selectedConnection}
             type="submit"
@@ -604,6 +577,19 @@ export default function CitizenReportIssuePage() {
           </Button>
         </div>
       </form>
+
+      {submittedPreview ? (
+        <DocumentPreviewModal
+          open={Boolean(submittedPreview)}
+          title={submittedPreview.title}
+          url={submittedPreview.url}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSubmittedPreview(null);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }
