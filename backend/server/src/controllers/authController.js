@@ -40,6 +40,47 @@ function clearAuthCookie(res) {
   });
 }
 
+function isAllowedOAuthReturnUrl(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return false;
+  }
+
+  return (
+    normalized.startsWith("http://localhost:") ||
+    normalized.startsWith("https://localhost:") ||
+    normalized.startsWith("capacitor://localhost") ||
+    normalized.startsWith("ionic://localhost") ||
+    normalized.startsWith(env.clientOrigin)
+  );
+}
+
+function resolveOAuthReturnUrl(req, fallbackUrl) {
+  const requestedReturnUrl =
+    typeof req.query?.returnTo === "string" ? req.query.returnTo : "";
+
+  if (isAllowedOAuthReturnUrl(requestedReturnUrl)) {
+    return requestedReturnUrl;
+  }
+
+  return fallbackUrl;
+}
+
+function resolveOAuthFailureUrl(returnUrl, fallbackUrl) {
+  const normalizedReturnUrl = String(returnUrl || "").trim();
+
+  if (!normalizedReturnUrl) {
+    return fallbackUrl;
+  }
+
+  try {
+    const parsed = new URL(normalizedReturnUrl);
+    return `${parsed.origin}/login?oauthError=1`;
+  } catch {
+    return fallbackUrl;
+  }
+}
+
 function isStaffRole(role) {
   return [
     roles.DIRECTOR,
@@ -186,25 +227,43 @@ export function beginGoogleOAuth(req, res, next) {
     return sendError(res, 503, "Google OAuth is not configured");
   }
 
+  const returnTo = resolveOAuthReturnUrl(req, env.oauthCitizenSuccessUrl);
+
   return passport.authenticate("google", {
     session: false,
     scope: ["profile", "email"],
+    state: returnTo,
   })(req, res, next);
 }
 
 function finalizeOAuthLogin(req, res, provider) {
   return passport.authenticate(provider, { session: false }, (error, user) => {
+    const requestedReturnUrl =
+      typeof req.query?.state === "string" ? req.query.state : "";
+    const successUrl = resolveOAuthReturnUrl(req, env.oauthCitizenSuccessUrl);
+    const failureUrl = resolveOAuthFailureUrl(
+      requestedReturnUrl,
+      env.oauthCitizenFailureUrl,
+    );
+
     if (error || !user) {
-      return res.redirect(env.oauthCitizenFailureUrl);
+      return res.redirect(failureUrl);
     }
 
     if (user.status === "inactive" || !user.isActive) {
-      return res.redirect(`${env.oauthCitizenFailureUrl}&reason=inactive`);
+      const inactiveUrl = failureUrl.includes("?")
+        ? `${failureUrl}&reason=inactive`
+        : `${failureUrl}?reason=inactive`;
+      return res.redirect(inactiveUrl);
     }
 
     const token = signToken({ sub: user._id, role: user.role });
     setAuthCookie(res, token);
-    return res.redirect(env.oauthCitizenSuccessUrl);
+    return res.redirect(
+      isAllowedOAuthReturnUrl(requestedReturnUrl)
+        ? requestedReturnUrl
+        : successUrl,
+    );
   })(req, res);
 }
 

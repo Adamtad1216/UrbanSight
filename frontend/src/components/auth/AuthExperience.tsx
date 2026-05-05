@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/lib/api";
+import { isNativeApp } from "@/lib/native";
 import { getDashboardPathByRole } from "@/lib/role-dashboard";
 import { cn } from "@/lib/utils";
 
@@ -136,7 +137,13 @@ export function AuthExperience({
   };
 
   const startGoogleLogin = () => {
-    window.location.assign(`${API_BASE_URL}/auth/google`);
+    const returnTo = isNativeApp()
+      ? "capacitor://localhost/citizen/dashboard"
+      : `${window.location.origin}/citizen/dashboard`;
+
+    window.location.assign(
+      `${API_BASE_URL}/auth/google?returnTo=${encodeURIComponent(returnTo)}`,
+    );
   };
 
   const onLoginSubmit = async (values: LoginValues) => {
