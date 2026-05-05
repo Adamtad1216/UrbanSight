@@ -70,6 +70,12 @@ interface DashboardItem {
   location?: { latitude: number; longitude: number };
 }
 
+function paymentLinkForItem(item: DashboardItem) {
+  return item.type === "Issue"
+    ? `/citizen/payment/${item.id}?source=issue`
+    : `/citizen/payment/${item.id}`;
+}
+
 const markerIcon = L.icon({
   iconRetinaUrl: iconRetina,
   iconUrl,
@@ -508,7 +514,7 @@ export default function CitizenDashboardPage() {
               </p>
             </div>
             <Button asChild>
-              <Link to={`/citizen/payment/${pendingPaymentItems[0].id}`}>
+              <Link to={paymentLinkForItem(pendingPaymentItems[0])}>
                 Pay Now
               </Link>
             </Button>
@@ -582,9 +588,9 @@ export default function CitizenDashboardPage() {
                         View Details
                       </Link>
                     </Button>
-                    {item.type === "New Connection" && item.needsPayment && (
+                    {item.needsPayment && (
                       <Button size="sm" asChild>
-                        <Link to={`/citizen/payment/${item.id}`}>
+                        <Link to={paymentLinkForItem(item)}>
                           Proceed to Payment
                         </Link>
                       </Button>

@@ -18,11 +18,17 @@ function normalizePhone(phone) {
 }
 
 export async function listStaffDirectory(_req, res) {
+  const branchFilter =
+    _req.user?.role === roles.COORDINATOR && _req.user?.branch
+      ? { branch: _req.user.branch }
+      : {};
+
   const users = await User.find({
     role: { $ne: roles.CITIZEN },
     status: "active",
+    ...branchFilter,
   })
-    .select("name email role phone branch")
+    .select("name email role phone branch status isActive")
     .sort({ role: 1, name: 1 })
     .lean();
 

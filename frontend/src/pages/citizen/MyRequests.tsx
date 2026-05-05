@@ -140,6 +140,14 @@ export default function CitizenMyRequestsPage() {
                     Estimated tools/payment: ${issue.totalEstimatedCost}
                   </p>
                 ) : null}
+
+                {issue.status === "waiting_payment" ? (
+                  <Button asChild>
+                    <Link to={`/citizen/payment/${issue._id}?source=issue`}>
+                      Proceed to Payment
+                    </Link>
+                  </Button>
+                ) : null}
               </motion.div>
             ))}
           </div>

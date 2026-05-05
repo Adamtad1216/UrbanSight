@@ -25,6 +25,7 @@ import ToolsManagement from "@/pages/ToolsManagement";
 import Settings from "@/pages/Settings";
 import Configuration from "@/pages/Configuration";
 import LeakagePrediction from "@/pages/LeakagePrediction";
+import BranchStaff from "@/pages/BranchStaff";
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,7 @@ export default function BackofficePortalApp() {
                     }
                   >
                     <Route path="dashboard" element={<Index />} />
+                    <Route path="branch-staff" element={<BranchStaff />} />
                   </Route>
                   <Route
                     path="/surveyor"

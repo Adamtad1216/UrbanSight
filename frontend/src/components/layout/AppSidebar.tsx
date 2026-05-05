@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell,
@@ -13,11 +13,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { getNavItemsForRole } from "@/components/layout/nav-config";
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  onNavigate?: () => void;
+}
+
+export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const location = useLocation();
 
   const navItems = getNavItemsForRole(user?.role);
 
@@ -46,6 +51,8 @@ export function AppSidebar() {
     Notifications: t("common.notifications", "Notifications"),
     Settings: t("common.settings", "Settings"),
     "Service Requests": t("nav.serviceRequests", "Service Requests"),
+    "Inspection Requests": t("nav.inspection", "Inspection"),
+    "Completed Requests": t("status.completed", "Completed"),
     Predictions: "Predictions",
     Inspection: t("nav.inspection", "Inspection"),
     Payments: t("nav.payments", "Payments"),
@@ -53,6 +60,32 @@ export function AppSidebar() {
     "Tools Management": "Tools Management",
     "Users & Roles": t("nav.usersRoles", "Users & Roles"),
     "Issue Reports": t("nav.issueReports", "Issue Reports"),
+    General: t("nav.general", "General"),
+    Services: t("nav.services", "Services"),
+    Tracking: t("nav.tracking", "Tracking"),
+    Account: t("nav.account", "Account"),
+    Management: t("nav.management", "Management"),
+    System: t("nav.system", "System"),
+    Operations: t("nav.operations", "Operations"),
+    "Field Work": t("nav.fieldWork", "Field Work"),
+    Readings: t("nav.readings", "Readings"),
+    Finance: t("nav.finance", "Finance"),
+    Administration: t("nav.administration", "Administration"),
+  };
+
+  const normalizeTargetPath = (path: string) => {
+    const [pathname, search = ""] = path.split("?");
+    return {
+      pathname: pathname || "/",
+      search: search ? `?${search}` : "",
+    };
+  };
+
+  const isExactNavItemActive = (path: string) => {
+    const target = normalizeTargetPath(path);
+    return (
+      location.pathname === target.pathname && location.search === target.search
+    );
   };
 
   return (
@@ -83,29 +116,50 @@ export function AppSidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-thin">
-        {navItems.map((item) => (
-          <NavLink
-            key={`${item.path}-${item.title}`}
-            to={item.path}
-            className={({ isActive }) =>
-              isActive ? "sidebar-item-active" : "sidebar-item-inactive"
-            }
-          >
-            <item.icon className="h-5 w-5 flex-shrink-0" />
-            <AnimatePresence>
+      <nav className="flex-1 py-4 px-3 space-y-6 overflow-y-auto scrollbar-thin">
+        {navItems.map((group) => (
+          <div key={group.label} className="space-y-2">
+            <AnimatePresence mode="wait">
               {!collapsed && (
-                <motion.span
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: "auto" }}
-                  exit={{ opacity: 0, width: 0 }}
-                  className="overflow-hidden whitespace-nowrap"
+                <motion.h3
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider"
                 >
-                  {navLabelMap[item.title] || item.title}
-                </motion.span>
+                  {navLabelMap[group.label] || group.label}
+                </motion.h3>
               )}
             </AnimatePresence>
-          </NavLink>
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <NavLink
+                  key={`${item.path}-${item.title}`}
+                  to={item.path}
+                  onClick={onNavigate}
+                  className={
+                    isExactNavItemActive(item.path)
+                      ? "sidebar-item-active"
+                      : "sidebar-item-inactive"
+                  }
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <AnimatePresence>
+                    {!collapsed && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        className="overflow-hidden whitespace-nowrap"
+                      >
+                        {navLabelMap[item.title] || item.title}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 

@@ -48,7 +48,11 @@ interface DashboardActivityResponse {
 
 interface DashboardChartsResponse {
   charts: {
-    requestsOverTime: Array<{ month: string; requests: number; completed: number }>;
+    requestsOverTime: Array<{
+      month: string;
+      requests: number;
+      completed: number;
+    }>;
     statusDistribution: Array<{ name: string; value: number }>;
     revenueTrend: Array<{ month: string; revenue: number }>;
   };
@@ -91,7 +95,10 @@ interface IssuesResponse {
 function isAssigned(value: unknown) {
   if (!value) return false;
   if (typeof value === "string") return value.length > 0;
-  if (typeof value === "object" && "_id" in (value as Record<string, unknown>)) {
+  if (
+    typeof value === "object" &&
+    "_id" in (value as Record<string, unknown>)
+  ) {
     return Boolean((value as { _id?: string })._id);
   }
   return false;
@@ -114,20 +121,40 @@ export default function Index() {
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStatsResponse["stats"] | null>(null);
-  const [activity, setActivity] = useState<DashboardActivityResponse["activity"]>([]);
-  const [charts, setCharts] = useState<DashboardChartsResponse["charts"] | null>(null);
+  const [stats, setStats] = useState<DashboardStatsResponse["stats"] | null>(
+    null,
+  );
+  const [activity, setActivity] = useState<
+    DashboardActivityResponse["activity"]
+  >([]);
+  const [charts, setCharts] = useState<
+    DashboardChartsResponse["charts"] | null
+  >(null);
 
-  const [staffDirectory, setStaffDirectory] = useState<StaffDirectoryResponse["users"]>([]);
+  const [staffDirectory, setStaffDirectory] = useState<
+    StaffDirectoryResponse["users"]
+  >([]);
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [issues, setIssues] = useState<IssueItem[]>([]);
 
-  const [requestAssignRole, setRequestAssignRole] = useState<Record<string, StaffRole>>({});
-  const [requestAssignee, setRequestAssignee] = useState<Record<string, string>>({});
-  const [issueAssignee, setIssueAssignee] = useState<Record<string, string>>({});
+  const [requestAssignRole, setRequestAssignRole] = useState<
+    Record<string, StaffRole>
+  >({});
+  const [requestAssignee, setRequestAssignee] = useState<
+    Record<string, string>
+  >({});
+  const [issueAssignee, setIssueAssignee] = useState<Record<string, string>>(
+    {},
+  );
 
   const isCoordinator = user?.role === "coordinator";
   const isAdmin = user?.role === "admin";
+  const isDirector = user?.role === "director";
+  const canViewRevenue = true; // Enabled for all staff as requested
+  const staffMetricTitle =
+    isAdmin || isDirector ? "Active Staff" : "Branch Staff";
+  const staffMetricChange =
+    isAdmin || isDirector ? "Global staff" : "Branch staff";
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -144,7 +171,8 @@ export default function Index() {
     } catch (error) {
       toast({
         title: "Dashboard error",
-        description: error instanceof Error ? error.message : "Unable to load dashboard",
+        description:
+          error instanceof Error ? error.message : "Unable to load dashboard",
         variant: "destructive",
       });
     } finally {
@@ -168,7 +196,10 @@ export default function Index() {
     } catch (error) {
       toast({
         title: "Assignment data error",
-        description: error instanceof Error ? error.message : "Unable to load assignment queues",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Unable to load assignment queues",
         variant: "destructive",
       });
     }
@@ -208,7 +239,8 @@ export default function Index() {
       requests.filter(
         (request) =>
           request.status === "approved" &&
-          (!Array.isArray(request.assignedTechnicians) || request.assignedTechnicians.length === 0),
+          (!Array.isArray(request.assignedTechnicians) ||
+            request.assignedTechnicians.length === 0),
       ),
     [requests],
   );
@@ -217,8 +249,9 @@ export default function Index() {
     () =>
       issues.filter(
         (issue) =>
-          ["approved", "payment_verified", "waiting_payment"].includes(issue.status) &&
-          !isAssigned(issue.assignedTechnician),
+          ["approved", "payment_verified", "waiting_payment"].includes(
+            issue.status,
+          ) && !isAssigned(issue.assignedTechnician),
       ),
     [issues],
   );
@@ -228,7 +261,9 @@ export default function Index() {
       return staffDirectory.filter(
         (member) =>
           member.role === role &&
-          (!requestOrIssueBranch || !member.branch || member.branch === requestOrIssueBranch),
+          (!requestOrIssueBranch ||
+            !member.branch ||
+            member.branch === requestOrIssueBranch),
       );
     },
     [staffDirectory],
@@ -239,7 +274,11 @@ export default function Index() {
     const selectedUser = requestAssignee[requestId];
 
     if (!selectedUser) {
-      toast({ title: "Assignee required", description: "Choose a staff member first", variant: "destructive" });
+      toast({
+        title: "Assignee required",
+        description: "Choose a staff member first",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -261,13 +300,17 @@ export default function Index() {
         body: payload,
       });
 
-      toast({ title: "Assignment updated", description: "Task was assigned successfully" });
+      toast({
+        title: "Assignment updated",
+        description: "Task was assigned successfully",
+      });
       await loadCoordinatorData();
       await loadDashboard();
     } catch (error) {
       toast({
         title: "Assignment failed",
-        description: error instanceof Error ? error.message : "Unable to assign task",
+        description:
+          error instanceof Error ? error.message : "Unable to assign task",
         variant: "destructive",
       });
     }
@@ -277,7 +320,11 @@ export default function Index() {
     const technicianId = issueAssignee[issueId];
 
     if (!technicianId) {
-      toast({ title: "Technician required", description: "Select a technician first", variant: "destructive" });
+      toast({
+        title: "Technician required",
+        description: "Select a technician first",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -287,13 +334,17 @@ export default function Index() {
         body: { technicianId },
       });
 
-      toast({ title: "Issue assigned", description: "Technician assigned successfully" });
+      toast({
+        title: "Issue assigned",
+        description: "Technician assigned successfully",
+      });
       await loadCoordinatorData();
       await loadDashboard();
     } catch (error) {
       toast({
         title: "Issue assignment failed",
-        description: error instanceof Error ? error.message : "Unable to assign issue",
+        description:
+          error instanceof Error ? error.message : "Unable to assign issue",
         variant: "destructive",
       });
     }
@@ -301,7 +352,10 @@ export default function Index() {
 
   return (
     <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
         <h1 className="text-2xl font-bold tracking-tight">{roleTitle}</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {isAdmin
@@ -310,7 +364,7 @@ export default function Index() {
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="Total Requests"
           value={String(stats?.totalRequests ?? 0)}
@@ -336,52 +390,104 @@ export default function Index() {
           delay={0.1}
         />
         <StatCard
-          title="Revenue"
-          value={formatCurrency(stats?.revenueCollected ?? 0)}
-          change={loading ? "Loading..." : "Verified payments"}
-          changeType="positive"
-          icon={DollarSign}
-          delay={0.15}
-        />
-        <StatCard
-          title="Active Staff"
+          title={staffMetricTitle}
           value={String(stats?.activeStaff ?? 0)}
-          change={loading ? "Loading..." : "Non-citizen active users"}
+          change={loading ? "Loading..." : staffMetricChange}
           changeType="neutral"
           icon={Users}
-          delay={0.2}
+          delay={0.15}
         />
+        {canViewRevenue ? (
+          <StatCard
+            title="Revenue"
+            value={formatCurrency(stats?.revenueCollected ?? 0)}
+            change={loading ? "Loading..." : "Verified payments"}
+            changeType="positive"
+            icon={DollarSign}
+            delay={0.2}
+          />
+        ) : null}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="glass-card rounded-xl p-5 lg:col-span-2">
+      <div
+        className={
+          canViewRevenue
+            ? "grid grid-cols-1 lg:grid-cols-3 gap-4"
+            : "grid grid-cols-1 lg:grid-cols-2 gap-4"
+        }
+      >
+        <div
+          className={
+            canViewRevenue
+              ? "glass-card rounded-xl p-5 lg:col-span-2"
+              : "glass-card rounded-xl p-5 lg:col-span-1"
+          }
+        >
           <h3 className="font-semibold mb-1">Request Throughput</h3>
-          <p className="text-xs text-muted-foreground mb-4">Requests versus completed over time</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Requests versus completed over time
+          </p>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={charts?.requestsOverTime || []}>
               <defs>
                 <linearGradient id="reqGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(199, 89%, 48%)" stopOpacity={0.28} />
-                  <stop offset="95%" stopColor="hsl(199, 89%, 48%)" stopOpacity={0} />
+                  <stop
+                    offset="5%"
+                    stopColor="hsl(199, 89%, 48%)"
+                    stopOpacity={0.28}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="hsl(199, 89%, 48%)"
+                    stopOpacity={0}
+                  />
                 </linearGradient>
                 <linearGradient id="doneGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(160, 84%, 40%)" stopOpacity={0.28} />
-                  <stop offset="95%" stopColor="hsl(160, 84%, 40%)" stopOpacity={0} />
+                  <stop
+                    offset="5%"
+                    stopColor="hsl(160, 84%, 40%)"
+                    stopOpacity={0.28}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="hsl(160, 84%, 40%)"
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" strokeOpacity={0.5} />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(215, 13%, 50%)" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(214, 20%, 90%)"
+                strokeOpacity={0.5}
+              />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 12 }}
+                stroke="hsl(215, 13%, 50%)"
+              />
               <YAxis tick={{ fontSize: 12 }} stroke="hsl(215, 13%, 50%)" />
               <Tooltip />
-              <Area type="monotone" dataKey="requests" stroke="hsl(199, 89%, 48%)" fill="url(#reqGrad)" />
-              <Area type="monotone" dataKey="completed" stroke="hsl(160, 84%, 40%)" fill="url(#doneGrad)" />
+              <Area
+                type="monotone"
+                dataKey="requests"
+                stroke="hsl(199, 89%, 48%)"
+                fill="url(#reqGrad)"
+              />
+              <Area
+                type="monotone"
+                dataKey="completed"
+                stroke="hsl(160, 84%, 40%)"
+                fill="url(#doneGrad)"
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
         <div className="glass-card rounded-xl p-5">
           <h3 className="font-semibold mb-1">Status Mix</h3>
-          <p className="text-xs text-muted-foreground mb-4">Current request status distribution</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Current request status distribution
+          </p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
@@ -396,6 +502,51 @@ export default function Index() {
             </PieChart>
           </ResponsiveContainer>
         </div>
+
+        {canViewRevenue ? (
+          <div className="glass-card rounded-xl p-5 lg:col-span-3">
+            <h3 className="font-semibold mb-1">Revenue Trend</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Verified payments over time
+            </p>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={charts?.revenueTrend || []}>
+                <defs>
+                  <linearGradient id="revOnlyGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor="hsl(152, 69%, 40%)"
+                      stopOpacity={0.28}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="hsl(152, 69%, 40%)"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(214, 20%, 90%)"
+                  strokeOpacity={0.5}
+                />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 12 }}
+                  stroke="hsl(215, 13%, 50%)"
+                />
+                <YAxis tick={{ fontSize: 12 }} stroke="hsl(215, 13%, 50%)" />
+                <Tooltip />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="hsl(152, 69%, 40%)"
+                  fill="url(#revOnlyGrad)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -403,10 +554,15 @@ export default function Index() {
           <h3 className="font-semibold mb-4">Recent Activity</h3>
           <div className="space-y-3">
             {activity.length === 0 && (
-              <p className="text-sm text-muted-foreground">No recent notifications.</p>
+              <p className="text-sm text-muted-foreground">
+                No recent notifications.
+              </p>
             )}
             {activity.map((item) => (
-              <div key={item.id} className="border-b border-border/60 pb-2 last:border-0">
+              <div
+                key={item.id}
+                className="border-b border-border/60 pb-2 last:border-0"
+              >
                 <p className="text-sm">{item.message}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {new Date(item.createdAt).toLocaleString()}
@@ -418,14 +574,31 @@ export default function Index() {
 
         <div className="glass-card rounded-xl p-5">
           <h3 className="font-semibold mb-1">Revenue Trend</h3>
-          <p className="text-xs text-muted-foreground mb-4">Verified collections by month</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Verified collections by month
+          </p>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={charts?.revenueTrend || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" strokeOpacity={0.5} />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(215, 13%, 50%)" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(214, 20%, 90%)"
+                strokeOpacity={0.5}
+              />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 12 }}
+                stroke="hsl(215, 13%, 50%)"
+              />
               <YAxis tick={{ fontSize: 12 }} stroke="hsl(215, 13%, 50%)" />
-              <Tooltip formatter={(value) => formatCurrency(Number(value || 0))} />
-              <Area type="monotone" dataKey="revenue" stroke="hsl(142, 72%, 35%)" fill="hsl(142, 72%, 35%, 0.2)" />
+              <Tooltip
+                formatter={(value) => formatCurrency(Number(value || 0))}
+              />
+              <Area
+                type="monotone"
+                dataKey="revenue"
+                stroke="hsl(142, 72%, 35%)"
+                fill="hsl(142, 72%, 35%, 0.2)"
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -437,65 +610,87 @@ export default function Index() {
 
           <div className="space-y-3">
             <p className="text-sm font-medium">Unassigned Request Tasks</p>
-            {[...unassignedSurveyRequests, ...unassignedTechnicianRequests].slice(0, 8).map((request) => {
-              const selectedRole = requestAssignRole[request._id] || "surveyor";
-              const staffOptions = getEligibleStaff(request.branch, selectedRole);
+            {[...unassignedSurveyRequests, ...unassignedTechnicianRequests]
+              .slice(0, 8)
+              .map((request) => {
+                const selectedRole =
+                  requestAssignRole[request._id] || "surveyor";
+                const staffOptions = getEligibleStaff(
+                  request.branch,
+                  selectedRole,
+                );
 
-              return (
-                <div key={request._id} className="grid grid-cols-1 lg:grid-cols-4 gap-2 items-center border border-border/60 rounded-lg p-3">
-                  <div>
-                    <p className="text-sm font-medium">{request.requestId || request._id}</p>
-                    <p className="text-xs text-muted-foreground">{request.status} {request.branch ? `• ${request.branch}` : ""}</p>
-                  </div>
-
-                  <Select
-                    value={selectedRole}
-                    onValueChange={(value) =>
-                      setRequestAssignRole((previous) => ({
-                        ...previous,
-                        [request._id]: value as StaffRole,
-                      }))
-                    }
+                return (
+                  <div
+                    key={request._id}
+                    className="grid grid-cols-1 lg:grid-cols-4 gap-2 items-center border border-border/60 rounded-lg p-3"
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="surveyor">Surveyor</SelectItem>
-                      <SelectItem value="technician">Technician</SelectItem>
-                      <SelectItem value="meter_reader">Meter Reader</SelectItem>
-                      <SelectItem value="coordinator">Coordinator</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {request.requestId || request._id}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {request.status}{" "}
+                        {request.branch ? `• ${request.branch}` : ""}
+                      </p>
+                    </div>
 
-                  <Select
-                    value={requestAssignee[request._id] || ""}
-                    onValueChange={(value) =>
-                      setRequestAssignee((previous) => ({
-                        ...previous,
-                        [request._id]: value,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select assignee" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {staffOptions.map((staff) => (
-                        <SelectItem key={staff._id} value={staff._id}>
-                          {staff.name} ({formatRoleLabel(staff.role)})
+                    <Select
+                      value={selectedRole}
+                      onValueChange={(value) =>
+                        setRequestAssignRole((previous) => ({
+                          ...previous,
+                          [request._id]: value as StaffRole,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="surveyor">Surveyor</SelectItem>
+                        <SelectItem value="technician">Technician</SelectItem>
+                        <SelectItem value="meter_reader">
+                          Meter Reader
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        <SelectItem value="coordinator">Coordinator</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                  <Button onClick={() => assignRequest(request._id)}>Assign</Button>
-                </div>
-              );
-            })}
+                    <Select
+                      value={requestAssignee[request._id] || ""}
+                      onValueChange={(value) =>
+                        setRequestAssignee((previous) => ({
+                          ...previous,
+                          [request._id]: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select assignee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staffOptions.map((staff) => (
+                          <SelectItem key={staff._id} value={staff._id}>
+                            {staff.name} ({formatRoleLabel(staff.role)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-            {unassignedSurveyRequests.length + unassignedTechnicianRequests.length === 0 && (
-              <p className="text-sm text-muted-foreground">No unassigned request tasks.</p>
+                    <Button onClick={() => assignRequest(request._id)}>
+                      Assign
+                    </Button>
+                  </div>
+                );
+              })}
+
+            {unassignedSurveyRequests.length +
+              unassignedTechnicianRequests.length ===
+              0 && (
+              <p className="text-sm text-muted-foreground">
+                No unassigned request tasks.
+              </p>
             )}
           </div>
 
@@ -504,10 +699,17 @@ export default function Index() {
             {unassignedIssueTechnicians.slice(0, 8).map((issue) => {
               const technicians = getEligibleStaff(issue.branch, "technician");
               return (
-                <div key={issue._id} className="grid grid-cols-1 lg:grid-cols-3 gap-2 items-center border border-border/60 rounded-lg p-3">
+                <div
+                  key={issue._id}
+                  className="grid grid-cols-1 lg:grid-cols-3 gap-2 items-center border border-border/60 rounded-lg p-3"
+                >
                   <div>
-                    <p className="text-sm font-medium">{issue.issueId || issue._id}</p>
-                    <p className="text-xs text-muted-foreground">{issue.status} {issue.branch ? `• ${issue.branch}` : ""}</p>
+                    <p className="text-sm font-medium">
+                      {issue.issueId || issue._id}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {issue.status} {issue.branch ? `• ${issue.branch}` : ""}
+                    </p>
                   </div>
 
                   <Select
@@ -531,13 +733,17 @@ export default function Index() {
                     </SelectContent>
                   </Select>
 
-                  <Button onClick={() => assignIssueTechnician(issue._id)}>Assign Technician</Button>
+                  <Button onClick={() => assignIssueTechnician(issue._id)}>
+                    Assign Technician
+                  </Button>
                 </div>
               );
             })}
 
             {unassignedIssueTechnicians.length === 0 && (
-              <p className="text-sm text-muted-foreground">No unassigned issue tasks.</p>
+              <p className="text-sm text-muted-foreground">
+                No unassigned issue tasks.
+              </p>
             )}
           </div>
         </div>

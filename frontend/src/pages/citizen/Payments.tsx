@@ -20,15 +20,32 @@ function formatCurrency(value: number) {
 
 export default function CitizenPaymentsPage() {
   const [requests, setRequests] = useState<NewConnectionRequest[]>([]);
+  const [issues, setIssues] = useState<
+    Array<{
+      _id: string;
+      title: string;
+      status: string;
+      totalEstimatedCost?: number;
+    }>
+  >([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await apiRequest<{ requests: NewConnectionRequest[] }>(
-          "/requests/my",
-        );
-        setRequests(response.requests || []);
+        const [requestResponse, issueResponse] = await Promise.all([
+          apiRequest<{ requests: NewConnectionRequest[] }>("/requests/my"),
+          apiRequest<{
+            issues: Array<{
+              _id: string;
+              title: string;
+              status: string;
+              totalEstimatedCost?: number;
+            }>;
+          }>("/issues/my"),
+        ]);
+        setRequests(requestResponse.requests || []);
+        setIssues(issueResponse.issues || []);
       } finally {
         setLoading(false);
       }
@@ -42,6 +59,11 @@ export default function CitizenPaymentsPage() {
     [requests],
   );
 
+  const issuePaymentQueue = useMemo(
+    () => issues.filter((issue) => needsPayment(issue.status)),
+    [issues],
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -53,9 +75,11 @@ export default function CitizenPaymentsPage() {
 
       {loading ? (
         <Card>
-          <CardContent className="py-8 text-muted-foreground">Loading payment queue...</CardContent>
+          <CardContent className="py-8 text-muted-foreground">
+            Loading payment queue...
+          </CardContent>
         </Card>
-      ) : paymentQueue.length === 0 ? (
+      ) : paymentQueue.length === 0 && issuePaymentQueue.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-muted-foreground text-center">
             No pending payments right now.
@@ -67,7 +91,9 @@ export default function CitizenPaymentsPage() {
             <Card key={request._id} className="rounded-xl">
               <CardHeader>
                 <CardTitle className="text-base flex items-center justify-between">
-                  <span className="font-mono">{request._id.slice(-8).toUpperCase()}</span>
+                  <span className="font-mono">
+                    {request._id.slice(-8).toUpperCase()}
+                  </span>
                   <StatusBadge status={request.status} />
                 </CardTitle>
               </CardHeader>
@@ -80,6 +106,38 @@ export default function CitizenPaymentsPage() {
                 </p>
                 <Button asChild>
                   <Link to={`/citizen/payment/${request._id}`}>Pay Now</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+
+          {issuePaymentQueue.map((issue) => (
+            <Card key={issue._id} className="rounded-xl">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span className="font-mono">
+                    {issue._id.slice(-8).toUpperCase()}
+                  </span>
+                  <StatusBadge status={issue.status} />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Service: Issue Report
+                </p>
+                <p
+                  className="text-sm text-muted-foreground truncate"
+                  title={issue.title}
+                >
+                  Title: {issue.title}
+                </p>
+                <p className="text-sm font-medium">
+                  Amount: {formatCurrency(issue.totalEstimatedCost || 0)}
+                </p>
+                <Button asChild>
+                  <Link to={`/citizen/payment/${issue._id}?source=issue`}>
+                    Pay Now
+                  </Link>
                 </Button>
               </CardContent>
             </Card>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Eye,
   FileText,
@@ -72,16 +72,38 @@ const defaultPaymentMethods = [
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export default function CitizenPaymentPage() {
+  type PaymentSource = "request" | "issue";
+  type PaymentTool = {
+    code?: string;
+    description?: string;
+    quantity?: number;
+    customerUnitPrice?: number;
+    unitPrice?: number;
+    totalPrice?: number;
+  };
+
+  type PaymentTargetDoc = {
+    _id: string;
+    status: string;
+    totalEstimatedCost?: number;
+    toolsRequired?: PaymentTool[];
+    customerName?: string;
+    serviceType?: string;
+    title?: string;
+  };
+
   const { id, requestId } = useParams();
+  const [searchParams] = useSearchParams();
   const effectiveRequestId = id || requestId;
+  const requestedSource =
+    searchParams.get("source") === "issue" ? "issue" : "request";
   const { toast } = useToast();
   const { openModal } = useSuccessModal();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
-  const [requestDoc, setRequestDoc] = useState<NewConnectionRequest | null>(
-    null,
-  );
+  const [requestDoc, setRequestDoc] = useState<PaymentTargetDoc | null>(null);
+  const [source, setSource] = useState<PaymentSource>(requestedSource);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -89,7 +111,9 @@ export default function CitizenPaymentPage() {
   const [paymentMethods, setPaymentMethods] = useState<string[]>([
     ...defaultPaymentMethods,
   ]);
-  const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethods[0]);
+  const [paymentMethod, setPaymentMethod] = useState<string>(
+    defaultPaymentMethods[0],
+  );
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState("");
   const [receiptPreviewOpen, setReceiptPreviewOpen] = useState(false);
@@ -161,11 +185,56 @@ export default function CitizenPaymentPage() {
 
     const loadRequest = async () => {
       try {
-        const response = await apiRequest<{ request: NewConnectionRequest }>(
-          `/requests/${effectiveRequestId}`,
-        );
+        if (requestedSource === "issue") {
+          const issueResponse = await apiRequest<{
+            issues: Array<{
+              _id: string;
+              title: string;
+              status: string;
+              totalEstimatedCost?: number;
+              toolsRequired?: PaymentTool[];
+            }>;
+          }>("/issues/my");
+          const issueDoc = (issueResponse.issues || []).find(
+            (issue) => issue._id === effectiveRequestId,
+          );
 
-        setRequestDoc(response.request);
+          if (!issueDoc) {
+            throw new Error("Issue not found");
+          }
+
+          setSource("issue");
+          setRequestDoc(issueDoc);
+          return;
+        }
+
+        try {
+          const response = await apiRequest<{ request: NewConnectionRequest }>(
+            `/requests/${effectiveRequestId}`,
+          );
+          setSource("request");
+          setRequestDoc(response.request);
+        } catch {
+          const issueResponse = await apiRequest<{
+            issues: Array<{
+              _id: string;
+              title: string;
+              status: string;
+              totalEstimatedCost?: number;
+              toolsRequired?: PaymentTool[];
+            }>;
+          }>("/issues/my");
+          const issueDoc = (issueResponse.issues || []).find(
+            (issue) => issue._id === effectiveRequestId,
+          );
+
+          if (!issueDoc) {
+            throw new Error("Request not found");
+          }
+
+          setSource("issue");
+          setRequestDoc(issueDoc);
+        }
       } catch (error) {
         toast({
           title: "Failed to load request",
@@ -179,7 +248,7 @@ export default function CitizenPaymentPage() {
     };
 
     loadRequest();
-  }, [effectiveRequestId, navigate, toast]);
+  }, [effectiveRequestId, navigate, requestedSource, toast]);
 
   useEffect(() => {
     const loadPaymentMethods = async () => {
@@ -189,7 +258,8 @@ export default function CitizenPaymentPage() {
         }>("/configuration");
 
         const configuredMethods =
-          response.configuration?.payments?.supportedMethods?.filter(Boolean) || [];
+          response.configuration?.payments?.supportedMethods?.filter(Boolean) ||
+          [];
 
         if (configuredMethods.length > 0) {
           setPaymentMethods(configuredMethods);
@@ -241,7 +311,12 @@ export default function CitizenPaymentPage() {
 
     try {
       setSubmitting(true);
-      await apiRequest(`/requests/request/${effectiveRequestId}/payment`, {
+      const paymentPath =
+        source === "issue"
+          ? `/issues/${effectiveRequestId}/payment`
+          : `/requests/request/${effectiveRequestId}/payment`;
+
+      await apiRequest(paymentPath, {
         method: "POST",
         body: formData,
       });
@@ -299,13 +374,13 @@ export default function CitizenPaymentPage() {
             <span className="text-muted-foreground">
               {t("common.customer", "Customer")}:
             </span>{" "}
-            {requestDoc.customerName}
+            {requestDoc.customerName || requestDoc.title || "-"}
           </p>
           <p>
             <span className="text-muted-foreground">
               {t("form.serviceType", "Service Type")}:
             </span>{" "}
-            {requestDoc.serviceType}
+            {requestDoc.serviceType || "Issue Report"}
           </p>
           <p>
             <span className="text-muted-foreground">
@@ -350,7 +425,9 @@ export default function CitizenPaymentPage() {
                   <td className="py-2 pr-3">{tool.code}</td>
                   <td className="py-2 pr-3">{tool.description}</td>
                   <td className="py-2 pr-3">{tool.quantity}</td>
-                  <td className="py-2 pr-3">{tool.customerUnitPrice}</td>
+                  <td className="py-2 pr-3">
+                    {tool.customerUnitPrice ?? tool.unitPrice ?? 0}
+                  </td>
                   <td className="py-2">{tool.totalPrice}</td>
                 </tr>
               ))}
@@ -446,7 +523,9 @@ export default function CitizenPaymentPage() {
                     <FileText className="h-4 w-4 text-primary" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{receiptFile.name}</p>
+                    <p className="truncate text-sm font-medium">
+                      {receiptFile.name}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {formatFileSize(receiptFile.size)}
                     </p>

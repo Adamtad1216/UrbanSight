@@ -6,10 +6,40 @@ import { roles } from "../utils/constants.js";
 import { sendOk } from "../utils/response.js";
 import { getLastMonthKeys, monthKey, monthLabel } from "../utils/timeSeries.js";
 
-async function getRevenueCollected() {
+function isGlobalDashboardRole(role) {
+  return role === roles.ADMIN || role === roles.DIRECTOR;
+}
+
+function getBranchScopeFilter(user) {
+  if (
+    !user?.branch ||
+    isGlobalDashboardRole(user.role) ||
+    user.role === roles.CITIZEN
+  ) {
+    return null;
+  }
+
+  return { branch: user.branch };
+}
+
+function withBranchScope(query, branchFilter) {
+  return branchFilter ? { ...query, ...branchFilter } : query;
+}
+
+async function getRevenueCollected(user) {
+  const branchFilter = getBranchScopeFilter(user);
+  const branchScopedRevenueAllowed =
+    isGlobalDashboardRole(user.role) || user.role !== roles.CITIZEN;
+
+  if (!branchScopedRevenueAllowed) {
+    return 0;
+  }
+
   const [requestRevenue, issueRevenue] = await Promise.all([
     NewConnectionRequest.aggregate([
-      { $match: { "payment.status": "verified" } },
+      {
+        $match: withBranchScope({ "payment.status": "verified" }, branchFilter),
+      },
       {
         $group: {
           _id: null,
@@ -18,7 +48,9 @@ async function getRevenueCollected() {
       },
     ]),
     IssueReport.aggregate([
-      { $match: { "payment.status": "verified" } },
+      {
+        $match: withBranchScope({ "payment.status": "verified" }, branchFilter),
+      },
       {
         $group: {
           _id: null,
@@ -34,13 +66,15 @@ async function getRevenueCollected() {
 }
 
 async function getRolePendingTasksCount(user) {
+  const branchFilter = getBranchScopeFilter(user);
+
   if (user.role === roles.DIRECTOR) {
     return NewConnectionRequest.countDocuments({ status: "submitted" });
   }
 
   if (user.role === roles.COORDINATOR) {
     return NewConnectionRequest.countDocuments({
-      branch: user.branch,
+      ...branchFilter,
       status: { $in: ["under_review", "inspection", "approved"] },
     });
   }
@@ -48,6 +82,7 @@ async function getRolePendingTasksCount(user) {
   if (user.role === roles.SURVEYOR) {
     return NewConnectionRequest.countDocuments({
       assignedSurveyor: user._id,
+      ...branchFilter,
       status: { $in: ["under_review", "inspection"] },
     });
   }
@@ -56,10 +91,12 @@ async function getRolePendingTasksCount(user) {
     const [requestTasks, issueTasks] = await Promise.all([
       NewConnectionRequest.countDocuments({
         assignedTechnicians: user._id,
+        ...branchFilter,
         status: "approved",
       }),
       IssueReport.countDocuments({
         assignedTechnician: user._id,
+        ...branchFilter,
         status: { $in: ["approved", "payment_verified", "waiting_payment"] },
       }),
     ]);
@@ -69,6 +106,7 @@ async function getRolePendingTasksCount(user) {
 
   if (user.role === roles.FINANCE) {
     return NewConnectionRequest.countDocuments({
+      ...branchFilter,
       status: "payment_submitted",
       $or: [
         { assignedFinanceOfficer: user._id },
@@ -93,11 +131,14 @@ async function getRolePendingTasksCount(user) {
   }
 
   return NewConnectionRequest.countDocuments({
+    ...branchFilter,
     status: { $nin: ["completed", "rejected"] },
   });
 }
 
 async function getRoleCompletedTasksCount(user) {
+  const branchFilter = getBranchScopeFilter(user);
+
   if (user.role === roles.CITIZEN) {
     const [requestCompleted, issueCompleted] = await Promise.all([
       NewConnectionRequest.countDocuments({
@@ -113,6 +154,7 @@ async function getRoleCompletedTasksCount(user) {
   if (user.role === roles.SURVEYOR) {
     return NewConnectionRequest.countDocuments({
       assignedSurveyor: user._id,
+      ...branchFilter,
       status: {
         $in: [
           "waiting_payment",
@@ -129,10 +171,12 @@ async function getRoleCompletedTasksCount(user) {
     const [requestDone, issueDone] = await Promise.all([
       NewConnectionRequest.countDocuments({
         assignedTechnicians: user._id,
+        ...branchFilter,
         "implementationCompletion.technicianCompletions.technician": user._id,
       }),
       IssueReport.countDocuments({
         assignedTechnician: user._id,
+        ...branchFilter,
         status: "completed",
       }),
     ]);
@@ -144,10 +188,12 @@ async function getRoleCompletedTasksCount(user) {
     const [requestVerified, issueVerified] = await Promise.all([
       NewConnectionRequest.countDocuments({
         assignedFinanceOfficer: user._id,
+        ...branchFilter,
         "payment.status": "verified",
       }),
       IssueReport.countDocuments({
         assignedFinanceOfficer: user._id,
+        ...branchFilter,
         "payment.status": "verified",
       }),
     ]);
@@ -155,11 +201,41 @@ async function getRoleCompletedTasksCount(user) {
     return requestVerified + issueVerified;
   }
 
-  return NewConnectionRequest.countDocuments({ status: "completed" });
+  const scope = branchFilter || {};
+  const [requestCompleted, issueCompleted] = await Promise.all([
+    NewConnectionRequest.countDocuments({ ...scope, status: "completed" }),
+    IssueReport.countDocuments({ ...scope, status: "completed" }),
+  ]);
+
+  return requestCompleted + issueCompleted;
+}
+
+async function getTotalRequestsCount(user) {
+  const branchFilter = getBranchScopeFilter(user);
+  const scope = branchFilter || {};
+
+  if (user.role === roles.CITIZEN) {
+    const [requestCount, issueCount] = await Promise.all([
+      NewConnectionRequest.countDocuments({ citizen: user._id }),
+      IssueReport.countDocuments({ citizen: user._id }),
+    ]);
+
+    return requestCount + issueCount;
+  }
+
+  const [requestCount, issueCount] = await Promise.all([
+    NewConnectionRequest.countDocuments(scope),
+    IssueReport.countDocuments(scope),
+  ]);
+
+  return requestCount + issueCount;
 }
 
 export async function getDashboardStats(req, res) {
   const user = req.user;
+  const branchFilter = getBranchScopeFilter(user);
+  const branchScopedStats =
+    !isGlobalDashboardRole(user.role) && user.role !== roles.CITIZEN;
 
   const [
     totalRequests,
@@ -168,13 +244,17 @@ export async function getDashboardStats(req, res) {
     revenueCollected,
     activeStaff,
   ] = await Promise.all([
-    user.role === roles.CITIZEN
-      ? NewConnectionRequest.countDocuments({ citizen: user._id })
-      : NewConnectionRequest.countDocuments(),
+    getTotalRequestsCount(user),
     getRolePendingTasksCount(user),
     getRoleCompletedTasksCount(user),
-    getRevenueCollected(),
-    User.countDocuments({ role: { $ne: roles.CITIZEN }, status: "active" }),
+    getRevenueCollected(user),
+    isGlobalDashboardRole(user.role)
+      ? User.countDocuments({ role: { $ne: roles.CITIZEN }, status: "active" })
+      : User.countDocuments({
+          role: { $ne: roles.CITIZEN },
+          status: "active",
+          ...(branchScopedStats && branchFilter ? branchFilter : {}),
+        }),
   ]);
 
   return sendOk(res, {
@@ -208,9 +288,17 @@ export async function getDashboardActivity(req, res) {
 }
 
 export async function getDashboardCharts(_req, res) {
-  const requests = await NewConnectionRequest.find({})
-    .select("createdAt status totalEstimatedCost payment")
-    .lean();
+  const user = _req.user;
+  const branchFilter = getBranchScopeFilter(user);
+  const scope = isGlobalDashboardRole(user.role) ? {} : branchFilter || {};
+  const [requests, issues] = await Promise.all([
+    NewConnectionRequest.find(scope)
+      .select("createdAt status totalEstimatedCost payment")
+      .lean(),
+    IssueReport.find(scope)
+      .select("createdAt status totalEstimatedCost payment")
+      .lean(),
+  ]);
 
   const lastSix = getLastMonthKeys(6);
 
@@ -241,6 +329,17 @@ export async function getDashboardCharts(_req, res) {
       if (revenueTrendMap[paymentKey] !== undefined) {
         revenueTrendMap[paymentKey] += Number(request.totalEstimatedCost || 0);
       }
+    }
+  }
+
+  for (const issue of issues) {
+    if (issue.payment?.status !== "verified") {
+      continue;
+    }
+
+    const paymentKey = monthKey(issue.payment.verifiedAt || issue.createdAt);
+    if (revenueTrendMap[paymentKey] !== undefined) {
+      revenueTrendMap[paymentKey] += Number(issue.totalEstimatedCost || 0);
     }
   }
 

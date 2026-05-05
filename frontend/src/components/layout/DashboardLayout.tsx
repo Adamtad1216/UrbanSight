@@ -70,7 +70,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               onClick={() => setMobileOpen(false)}
             />
             <div className="lg:hidden z-50 fixed top-0 left-0">
-              <AppSidebar />
+              <AppSidebar onNavigate={() => setMobileOpen(false)} />
             </div>
           </>
         )}

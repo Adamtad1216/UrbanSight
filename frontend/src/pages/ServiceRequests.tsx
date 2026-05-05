@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
   Eye,
@@ -117,6 +117,26 @@ function getAssignedStaffName(request: NewConnectionRequest) {
   );
 }
 
+interface CompletedIssueItem {
+  _id: string;
+  title: string;
+  category?: string;
+  status: string;
+  branch?: string;
+  citizen?: string | { name?: string };
+  assignedTechnician?: string | { name?: string };
+}
+
+function getIssueUserName(
+  value:
+    | CompletedIssueItem["citizen"]
+    | CompletedIssueItem["assignedTechnician"],
+) {
+  if (!value) return "-";
+  if (typeof value === "string") return value;
+  return value.name || "-";
+}
+
 function asUserId(value: unknown): string {
   if (!value) return "";
   if (typeof value === "string") return value;
@@ -133,11 +153,18 @@ function asUserId(value: unknown): string {
 export default function ServiceRequestsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { openModal } = useSuccessModal();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(
+    searchParams.get("status") || "all",
+  );
   const [requests, setRequests] = useState<NewConnectionRequest[]>([]);
+  const [completedIssues, setCompletedIssues] = useState<CompletedIssueItem[]>(
+    [],
+  );
+  const [loadingCompletedIssues, setLoadingCompletedIssues] = useState(true);
   const [selected, setSelected] = useState<NewConnectionRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [inspectionNotes, setInspectionNotes] = useState("");
@@ -355,6 +382,24 @@ export default function ServiceRequestsPage() {
     loadRequests();
   }, [loadRequests]);
 
+  const loadCompletedIssues = useCallback(async () => {
+    try {
+      setLoadingCompletedIssues(true);
+      const response = await apiRequest<{ issues: CompletedIssueItem[] }>(
+        "/issues?status=completed",
+      );
+      setCompletedIssues(response.issues || []);
+    } catch (error) {
+      handleActionError("Failed to load completed issues", error);
+    } finally {
+      setLoadingCompletedIssues(false);
+    }
+  }, [handleActionError]);
+
+  useEffect(() => {
+    loadCompletedIssues();
+  }, [loadCompletedIssues]);
+
   useEffect(() => {
     if (user?.role !== "surveyor") return;
 
@@ -380,60 +425,18 @@ export default function ServiceRequestsPage() {
   }, [toast, user?.role]);
 
   const isVisibleToCurrentRole = useCallback(
-    (requestDoc: NewConnectionRequest) => {
-      const branchStage = requestDoc.branchApprovalStage || 0;
-      const assignedSurveyorId = asUserId(requestDoc.assignedSurveyor);
-      const assignedTechnicianIds = (requestDoc.assignedTechnicians || []).map(
-        asUserId,
-      );
-      const assignedTechnicianCount =
-        requestDoc.assignedTechnicians?.length || 0;
-      const completedTechnicianCount =
-        requestDoc.implementationCompletion?.technicianCompletions?.length || 0;
-      const isReadyForBranchFinalApproval =
-        requestDoc.workflowLogs?.some(
-          (entry) =>
-            entry.action === "implementation_ready_for_final_branch_approval",
-        ) || false;
-      const assignedFinanceId = asUserId(requestDoc.assignedFinanceOfficer);
-      const assignedMeterReaderId = asUserId(requestDoc.assignedMeterReader);
-
-      if (user?.role === "surveyor") {
-        return (
-          requestDoc.status === "inspection" &&
-          branchStage >= 1 &&
-          assignedSurveyorId === currentUserId
-        );
-      }
-
-      if (user?.role === "technician") {
-        const allTechniciansCompleted =
-          assignedTechnicianCount > 0 &&
-          completedTechnicianCount >= assignedTechnicianCount;
-
-        return (
-          requestDoc.status === "approved" &&
-          assignedTechnicianIds.includes(currentUserId) &&
-          !allTechniciansCompleted &&
-          !isReadyForBranchFinalApproval
-        );
-      }
-
-      if (user?.role === "finance") {
-        return (
-          requestDoc.status === "payment_submitted" &&
-          assignedFinanceId === currentUserId
-        );
-      }
-
-      if (user?.role === "meter_reader") {
-        return assignedMeterReaderId === currentUserId;
-      }
-
-      return true;
+    (_requestDoc: NewConnectionRequest) => {
+      // Backoffice users should be able to browse all request statuses
+      // from Service Requests. Action buttons remain role-gated elsewhere.
+      return user?.role !== "citizen";
     },
-    [currentUserId, user?.role],
+    [user?.role],
   );
+
+  useEffect(() => {
+    const statusFromUrl = searchParams.get("status") || "all";
+    setStatusFilter(statusFromUrl);
+  }, [searchParams]);
 
   const filtered = useMemo(
     () =>
@@ -834,7 +837,19 @@ export default function ServiceRequestsPage() {
             className="pl-9 bg-muted/50"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) => {
+            setStatusFilter(value);
+            const next = new URLSearchParams(searchParams);
+            if (value === "all") {
+              next.delete("status");
+            } else {
+              next.set("status", value);
+            }
+            setSearchParams(next, { replace: true });
+          }}
+        >
           <SelectTrigger className="w-40 bg-muted/50">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -948,6 +963,85 @@ export default function ServiceRequestsPage() {
                         </Button>
                       )}
                     </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="glass-card rounded-xl overflow-hidden"
+      >
+        <div className="px-4 py-3 border-b border-border/50">
+          <h2 className="text-sm font-semibold tracking-wide">
+            Completed Issue Reports
+          </h2>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border/50">
+              <TableHead className="font-semibold">Issue ID</TableHead>
+              <TableHead className="font-semibold">Title</TableHead>
+              <TableHead className="font-semibold hidden md:table-cell">
+                Category
+              </TableHead>
+              <TableHead className="font-semibold hidden lg:table-cell">
+                Branch
+              </TableHead>
+              <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold hidden lg:table-cell">
+                Citizen
+              </TableHead>
+              <TableHead className="font-semibold hidden lg:table-cell">
+                Technician
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loadingCompletedIssues ? (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="text-muted-foreground py-8 text-center"
+                >
+                  Loading completed issue reports...
+                </TableCell>
+              </TableRow>
+            ) : completedIssues.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="text-muted-foreground py-8 text-center"
+                >
+                  No completed issue reports found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              completedIssues.map((issue) => (
+                <TableRow key={issue._id} className="border-border/50">
+                  <TableCell className="font-mono text-sm font-medium">
+                    {issue._id.slice(-8).toUpperCase()}
+                  </TableCell>
+                  <TableCell>{issue.title}</TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground capitalize">
+                    {(issue.category || "general").replace(/_/g, " ")}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">
+                    {issue.branch || "-"}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={issue.status} />
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">
+                    {getIssueUserName(issue.citizen)}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">
+                    {getIssueUserName(issue.assignedTechnician)}
                   </TableCell>
                 </TableRow>
               ))

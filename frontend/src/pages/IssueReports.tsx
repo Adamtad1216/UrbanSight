@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { Check, ChevronsUpDown, Plus, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,6 +18,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tool } from "@/types/tool";
+import { cn } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 interface IssueUser {
   _id?: string;
@@ -39,18 +55,24 @@ interface IssueRecord {
 }
 
 interface ToolDraft {
+  toolId: string;
   code: string;
   description: string;
   source: string;
   quantity: number;
+  measurement: string;
+  stockPrice: number;
   unitPrice: number;
 }
 
 const defaultToolDraft: ToolDraft = {
+  toolId: "",
   code: "",
   description: "",
-  source: "store",
+  source: "",
   quantity: 1,
+  measurement: "",
+  stockPrice: 0,
   unitPrice: 1,
 };
 
@@ -62,7 +84,6 @@ const statuses = [
   "payment_submitted",
   "payment_verified",
   "payment_rejected",
-  "completed",
   "rejected",
 ] as const;
 
@@ -81,10 +102,22 @@ export default function IssueReportsPage() {
   const [statusFilter, setStatusFilter] =
     useState<(typeof statuses)[number]>("all");
   const [toolDraftByIssueId, setToolDraftByIssueId] = useState<
-    Record<string, ToolDraft>
+    Record<string, ToolDraft[]>
   >({});
+  const [availableTools, setAvailableTools] = useState<Tool[]>([]);
+  const [loadingTools, setLoadingTools] = useState(false);
+  const [openToolPickerKey, setOpenToolPickerKey] = useState<string | null>(
+    null,
+  );
   const [rejectIssueId, setRejectIssueId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-ET", {
+      style: "currency",
+      currency: "ETB",
+      maximumFractionDigits: 2,
+    }).format(value || 0);
 
   const loadIssues = useCallback(async () => {
     try {
@@ -92,7 +125,12 @@ export default function IssueReportsPage() {
       const response = await apiRequest<{ issues: IssueRecord[] }>(
         `/issues${query}`,
       );
-      setIssues(response.issues || []);
+      const fetchedIssues = response.issues || [];
+      setIssues(
+        statusFilter === "all"
+          ? fetchedIssues.filter((issue) => issue.status !== "completed")
+          : fetchedIssues,
+      );
     } catch (error) {
       toast({
         title: "Failed to load issues",
@@ -106,6 +144,30 @@ export default function IssueReportsPage() {
     loadIssues();
   }, [loadIssues]);
 
+  useEffect(() => {
+    if (user?.role !== "technician") return;
+
+    const loadToolCatalog = async () => {
+      try {
+        setLoadingTools(true);
+        const response = await apiRequest<{ tools: Tool[] }>(
+          "/tools?limit=200&page=1",
+        );
+        setAvailableTools(response.tools || []);
+      } catch (error) {
+        toast({
+          title: "Failed to load tools",
+          description: error instanceof Error ? error.message : "Try again",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingTools(false);
+      }
+    };
+
+    loadToolCatalog();
+  }, [toast, user?.role]);
+
   const stat = useMemo(() => {
     const submitted = issues.filter(
       (issue) => issue.status === "submitted",
@@ -116,11 +178,11 @@ export default function IssueReportsPage() {
     const payment = issues.filter(
       (issue) => issue.status === "payment_submitted",
     ).length;
-    const completed = issues.filter(
-      (issue) => issue.status === "completed",
+    const ongoing = issues.filter(
+      (issue) => issue.status !== "completed",
     ).length;
 
-    return { submitted, approved, payment, completed };
+    return { submitted, approved, payment, ongoing };
   }, [issues]);
 
   const mutateIssue = async (
@@ -192,22 +254,113 @@ export default function IssueReportsPage() {
       "Issue completed successfully.",
     );
 
-  const onTechnicianRequestPayment = async (issueId: string) => {
-    const toolDraft = toolDraftByIssueId[issueId] || defaultToolDraft;
+  const getIssueToolRows = (issueId: string) => {
+    const rows = toolDraftByIssueId[issueId];
+    return rows && rows.length > 0 ? rows : [defaultToolDraft];
+  };
 
-    if (!toolDraft.code || !toolDraft.description || !toolDraft.source) {
+  const setIssueToolRows = (issueId: string, rows: ToolDraft[]) => {
+    setToolDraftByIssueId((previous) => ({
+      ...previous,
+      [issueId]: rows,
+    }));
+  };
+
+  const updateIssueToolRow = (
+    issueId: string,
+    index: number,
+    key: keyof ToolDraft,
+    value: string,
+  ) => {
+    const currentRows = getIssueToolRows(issueId);
+    const nextRows = currentRows.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+
+      if (key === "quantity" || key === "unitPrice" || key === "stockPrice") {
+        const parsed = Number(value);
+        return {
+          ...row,
+          [key]: Number.isFinite(parsed) ? parsed : 0,
+        };
+      }
+
+      return {
+        ...row,
+        [key]: value,
+      };
+    });
+
+    setIssueToolRows(issueId, nextRows);
+  };
+
+  const selectIssueToolRow = (issueId: string, index: number, tool: Tool) => {
+    const currentRows = getIssueToolRows(issueId);
+    const nextRows = currentRows.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      return {
+        ...row,
+        toolId: tool._id,
+        code: tool.code,
+        description: tool.description,
+        source: tool.source,
+        measurement: tool.measurement,
+        stockPrice: tool.stockPrice,
+        unitPrice: tool.customerPrice,
+      };
+    });
+
+    if (index === nextRows.length - 1) {
+      nextRows.push({ ...defaultToolDraft });
+    }
+
+    setIssueToolRows(issueId, nextRows);
+    setOpenToolPickerKey(null);
+  };
+
+  const addIssueToolRow = (issueId: string) => {
+    const currentRows = getIssueToolRows(issueId);
+    setIssueToolRows(issueId, [...currentRows, { ...defaultToolDraft }]);
+  };
+
+  const removeIssueToolRow = (issueId: string, index: number) => {
+    const currentRows = getIssueToolRows(issueId);
+    if (currentRows.length === 1) return;
+    setIssueToolRows(
+      issueId,
+      currentRows.filter((_, rowIndex) => rowIndex !== index),
+    );
+  };
+
+  const onTechnicianRequestPayment = async (issueId: string) => {
+    const selectedTools = getIssueToolRows(issueId).filter(
+      (tool) => tool.toolId.trim().length > 0,
+    );
+
+    if (selectedTools.length === 0) {
       toast({
         title: "Tool details required",
-        description: "Enter tool code, description, and source first.",
+        description: "Please select at least one tool from the catalog.",
         variant: "destructive",
       });
       return;
     }
 
-    if (toolDraft.quantity <= 0 || toolDraft.unitPrice <= 0) {
+    const hasInvalidTool = selectedTools.some(
+      (tool) =>
+        !tool.toolId.trim() ||
+        !tool.code.trim() ||
+        !tool.description.trim() ||
+        !tool.source.trim() ||
+        !Number.isFinite(tool.quantity) ||
+        tool.quantity <= 0 ||
+        !Number.isFinite(tool.unitPrice) ||
+        tool.unitPrice <= 0,
+    );
+
+    if (hasInvalidTool) {
       toast({
         title: "Invalid quantity or price",
-        description: "Quantity and unit price must be greater than 0.",
+        description: "Each selected tool must have quantity and price > 0.",
         variant: "destructive",
       });
       return;
@@ -218,7 +371,13 @@ export default function IssueReportsPage() {
       `/issues/${issueId}/technician-update`,
       {
         note: "Tools required, waiting for citizen payment",
-        toolsRequired: [toolDraft],
+        toolsRequired: selectedTools.map((tool) => ({
+          code: tool.code,
+          description: tool.description,
+          source: tool.source,
+          quantity: tool.quantity,
+          unitPrice: tool.unitPrice,
+        })),
       },
       "Payment request sent to citizen.",
     );
@@ -305,10 +464,10 @@ export default function IssueReportsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Completed</CardTitle>
+            <CardTitle className="text-sm">Ongoing</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {stat.completed}
+            {stat.ongoing}
           </CardContent>
         </Card>
       </div>
@@ -322,7 +481,11 @@ export default function IssueReportsPage() {
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {issues.map((issue) => {
-            const toolDraft = toolDraftByIssueId[issue._id] || defaultToolDraft;
+            const toolRows = getIssueToolRows(issue._id);
+            const grandTotal = toolRows.reduce(
+              (sum, tool) => sum + tool.quantity * tool.unitPrice,
+              0,
+            );
 
             return (
               <Card key={issue._id} className="glass-card">
@@ -398,105 +561,202 @@ export default function IssueReportsPage() {
                     <div className="space-y-3 rounded-md border border-border/70 p-3">
                       <p className="text-xs font-medium">Technician Actions</p>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label htmlFor={`tool-code-${issue._id}`}>
-                            Tool Code
-                          </Label>
-                          <Input
-                            id={`tool-code-${issue._id}`}
-                            value={toolDraft.code}
-                            onChange={(event) =>
-                              setToolDraftByIssueId((previous) => ({
-                                ...previous,
-                                [issue._id]: {
-                                  ...toolDraft,
-                                  code: event.target.value,
-                                },
-                              }))
-                            }
-                          />
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs">Tools / Materials</Label>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => addIssueToolRow(issue._id)}
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Add Row
+                          </Button>
                         </div>
-                        <div className="space-y-1">
-                          <Label htmlFor={`tool-source-${issue._id}`}>
-                            Source
-                          </Label>
-                          <Input
-                            id={`tool-source-${issue._id}`}
-                            value={toolDraft.source}
-                            onChange={(event) =>
-                              setToolDraftByIssueId((previous) => ({
-                                ...previous,
-                                [issue._id]: {
-                                  ...toolDraft,
-                                  source: event.target.value,
-                                },
-                              }))
-                            }
-                          />
+
+                        <div className="space-y-2 pb-1">
+                          <div className="grid grid-cols-12 gap-1 px-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide sm:text-[11px]">
+                            <span className="col-span-3">Tool</span>
+                            <span className="col-span-1">Code</span>
+                            <span className="col-span-2">Source</span>
+                            <span className="col-span-1">Qty</span>
+                            <span className="col-span-1">Measure</span>
+                            <span className="col-span-1">Stock</span>
+                            <span className="col-span-1">Price</span>
+                            <span className="col-span-2">Total</span>
+                          </div>
+
+                          {toolRows.map((tool, index) => {
+                            const rowTotal = tool.quantity * tool.unitPrice;
+                            const selectedToolIds = new Set(
+                              toolRows
+                                .filter(
+                                  (row, rowIndex) =>
+                                    rowIndex !== index && row.toolId,
+                                )
+                                .map((row) => row.toolId),
+                            );
+                            const pickerKey = `${issue._id}-${index}`;
+
+                            return (
+                              <div
+                                key={`${tool.code}-${index}`}
+                                className="grid grid-cols-12 gap-1 border rounded-md p-2"
+                              >
+                                <div className="col-span-3">
+                                  <Popover
+                                    open={openToolPickerKey === pickerKey}
+                                    onOpenChange={(open) => {
+                                      setOpenToolPickerKey(
+                                        open ? pickerKey : null,
+                                      );
+                                    }}
+                                  >
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        role="combobox"
+                                        className="w-full justify-between"
+                                      >
+                                        <span className="truncate text-left">
+                                          {tool.description || "Select tool"}
+                                        </span>
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      className="w-[420px] p-0"
+                                      align="start"
+                                    >
+                                      <Command>
+                                        <CommandInput placeholder="Search tools (e.g. PVC)..." />
+                                        <CommandList>
+                                          <CommandEmpty>
+                                            {loadingTools
+                                              ? "Loading tools..."
+                                              : "No tool found."}
+                                          </CommandEmpty>
+                                          <CommandGroup>
+                                            {availableTools.map(
+                                              (catalogTool) => (
+                                                <CommandItem
+                                                  key={catalogTool._id}
+                                                  value={`${catalogTool.code} ${catalogTool.description} ${catalogTool.source}`}
+                                                  disabled={selectedToolIds.has(
+                                                    catalogTool._id,
+                                                  )}
+                                                  onSelect={() =>
+                                                    selectIssueToolRow(
+                                                      issue._id,
+                                                      index,
+                                                      catalogTool,
+                                                    )
+                                                  }
+                                                >
+                                                  <Check
+                                                    className={cn(
+                                                      "mr-2 h-4 w-4",
+                                                      tool.toolId ===
+                                                        catalogTool._id
+                                                        ? "opacity-100"
+                                                        : "opacity-0",
+                                                    )}
+                                                  />
+                                                  <span className="truncate">
+                                                    {catalogTool.code} -{" "}
+                                                    {catalogTool.description}
+                                                  </span>
+                                                </CommandItem>
+                                              ),
+                                            )}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+
+                                <div className="col-span-1 flex items-center text-xs font-medium text-muted-foreground">
+                                  {tool.code || "-"}
+                                </div>
+
+                                <div className="col-span-2 flex items-center text-xs text-muted-foreground">
+                                  {tool.source || "-"}
+                                </div>
+
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  placeholder="Qty"
+                                  value={tool.quantity}
+                                  className="col-span-1"
+                                  onChange={(event) =>
+                                    updateIssueToolRow(
+                                      issue._id,
+                                      index,
+                                      "quantity",
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+
+                                <div className="col-span-1 flex items-center text-xs text-muted-foreground">
+                                  {tool.measurement || "-"}
+                                </div>
+
+                                <div className="col-span-1 flex items-center text-xs text-muted-foreground">
+                                  {formatCurrency(tool.stockPrice)}
+                                </div>
+
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  step="0.01"
+                                  placeholder="Unit price"
+                                  value={tool.unitPrice}
+                                  className="col-span-1"
+                                  onChange={(event) =>
+                                    updateIssueToolRow(
+                                      issue._id,
+                                      index,
+                                      "unitPrice",
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+
+                                <div className="col-span-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                  <span className="font-medium text-foreground">
+                                    {formatCurrency(rowTotal)}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() =>
+                                      removeIssueToolRow(issue._id, index)
+                                    }
+                                    disabled={toolRows.length === 1}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <Label htmlFor={`tool-description-${issue._id}`}>
-                          Description
-                        </Label>
-                        <Input
-                          id={`tool-description-${issue._id}`}
-                          value={toolDraft.description}
-                          onChange={(event) =>
-                            setToolDraftByIssueId((previous) => ({
-                              ...previous,
-                              [issue._id]: {
-                                ...toolDraft,
-                                description: event.target.value,
-                              },
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label htmlFor={`tool-quantity-${issue._id}`}>
-                            Quantity
-                          </Label>
-                          <Input
-                            id={`tool-quantity-${issue._id}`}
-                            type="number"
-                            min={1}
-                            value={toolDraft.quantity}
-                            onChange={(event) =>
-                              setToolDraftByIssueId((previous) => ({
-                                ...previous,
-                                [issue._id]: {
-                                  ...toolDraft,
-                                  quantity: Number(event.target.value || 1),
-                                },
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor={`tool-unit-price-${issue._id}`}>
-                            Unit Price
-                          </Label>
-                          <Input
-                            id={`tool-unit-price-${issue._id}`}
-                            type="number"
-                            min={1}
-                            value={toolDraft.unitPrice}
-                            onChange={(event) =>
-                              setToolDraftByIssueId((previous) => ({
-                                ...previous,
-                                [issue._id]: {
-                                  ...toolDraft,
-                                  unitPrice: Number(event.target.value || 1),
-                                },
-                              }))
-                            }
-                          />
-                        </div>
+                      <div className="flex items-center justify-between border rounded-md px-3 py-2 text-sm">
+                        <span className="text-muted-foreground">
+                          Grand Total
+                        </span>
+                        <span className="font-semibold">
+                          {formatCurrency(grandTotal)}
+                        </span>
                       </div>
 
                       <div className="flex flex-wrap gap-2">

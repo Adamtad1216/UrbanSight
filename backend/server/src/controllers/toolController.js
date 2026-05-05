@@ -16,7 +16,12 @@ const NORMALIZED_EXPECTED_HEADERS = EXPECTED_TOOL_IMPORT_HEADERS.map((header) =>
   normalizeHeader(header),
 );
 
-const ALLOWED_TOOL_SOURCES = new Set(["Warehouse", "Store", "Local", "Service"]);
+const ALLOWED_TOOL_SOURCES = new Set([
+  "Warehouse",
+  "Store",
+  "Local",
+  "Service",
+]);
 
 function parsePrice(value) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -51,7 +56,9 @@ function isEmptyRow(values) {
 
 export async function createTool(req, res) {
   try {
-    const existing = await Tool.findOne({ code: req.body.code.toUpperCase() }).lean();
+    const existing = await Tool.findOne({
+      code: req.body.code.toUpperCase(),
+    }).lean();
     if (existing) {
       return sendError(res, 400, "Tool code already exists");
     }
@@ -75,7 +82,8 @@ export async function listTools(req, res) {
     const query = String(req.query.q || "").trim();
     const includeInactiveRequested =
       String(req.query.includeInactive || "false") === "true";
-    const includeInactive = includeInactiveRequested && req.user?.role === "admin";
+    const includeInactive =
+      includeInactiveRequested && req.user?.role === "admin";
 
     const filter = {};
 
@@ -93,11 +101,7 @@ export async function listTools(req, res) {
     }
 
     const [tools, total] = await Promise.all([
-      Tool.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      Tool.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Tool.countDocuments(filter),
     ]);
 
@@ -136,11 +140,15 @@ export async function updateTool(req, res) {
       tool.code = normalizedCode;
     }
 
-    if (req.body.description !== undefined) tool.description = req.body.description;
+    if (req.body.description !== undefined)
+      tool.description = req.body.description;
     if (req.body.source !== undefined) tool.source = req.body.source;
-    if (req.body.measurement !== undefined) tool.measurement = req.body.measurement;
-    if (req.body.stockPrice !== undefined) tool.stockPrice = req.body.stockPrice;
-    if (req.body.customerPrice !== undefined) tool.customerPrice = req.body.customerPrice;
+    if (req.body.measurement !== undefined)
+      tool.measurement = req.body.measurement;
+    if (req.body.stockPrice !== undefined)
+      tool.stockPrice = req.body.stockPrice;
+    if (req.body.customerPrice !== undefined)
+      tool.customerPrice = req.body.customerPrice;
     if (req.body.isActive !== undefined) tool.isActive = req.body.isActive;
 
     await tool.save();
@@ -193,15 +201,24 @@ export async function importTools(req, res) {
     }
 
     const headerRow = Array.isArray(grid[0]) ? grid[0] : [];
-    const normalizedHeaders = headerRow.map((header) => normalizeHeader(header));
-    const requiredHeaders = normalizedHeaders.slice(0, NORMALIZED_EXPECTED_HEADERS.length);
-    const trailingHeaders = normalizedHeaders.slice(NORMALIZED_EXPECTED_HEADERS.length);
+    const normalizedHeaders = headerRow.map((header) =>
+      normalizeHeader(header),
+    );
+    const requiredHeaders = normalizedHeaders.slice(
+      0,
+      NORMALIZED_EXPECTED_HEADERS.length,
+    );
+    const trailingHeaders = normalizedHeaders.slice(
+      NORMALIZED_EXPECTED_HEADERS.length,
+    );
 
     const hasValidRequiredHeaders = NORMALIZED_EXPECTED_HEADERS.every(
       (expected, index) => requiredHeaders[index] === expected,
     );
 
-    const hasUnexpectedExtraHeaders = trailingHeaders.some((header) => header !== "");
+    const hasUnexpectedExtraHeaders = trailingHeaders.some(
+      (header) => header !== "",
+    );
 
     if (!hasValidRequiredHeaders || hasUnexpectedExtraHeaders) {
       return sendError(

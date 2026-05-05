@@ -68,7 +68,10 @@ export function resolveMongoUri() {
 
 function getConnectionOptions() {
   mongoose.set("strictQuery", true);
-  mongoose.set("sanitizeFilter", true);
+  // Note: sanitizeFilter is intentionally omitted here.
+  // Enabling it breaks internal Mongoose operator queries ($nin, $ne, $in, etc.)
+  // by wrapping their values in $eq. The app already sanitizes incoming request
+  // payloads via sanitizePayloadInPlace middleware in app.js.
 
   return {
     dbName: env.dbName,
